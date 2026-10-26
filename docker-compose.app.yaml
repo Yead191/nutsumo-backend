@@ -1,0 +1,69 @@
+services:
+  kong:
+    image: kong # specific version recommended instead of latest
+    container_name: kong
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /etc/kong/kong.yml
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_NGINX_WORKER_PROCESSES: "auto"
+      KONG_NGINX_WORKER_CONNECTIONS: "4096"
+    volumes:
+      - ./kong.yaml:/etc/kong/kong.yml:ro
+    ports:
+      - "${IP_ADDRESS}:${PORT}:8000"
+      - "10.10.7.9:8001:8001"
+    networks:
+      - template-network
+
+  kong-keepalive:
+    build:
+      context: .
+      dockerfile: Dockerfile.keepalive
+    depends_on:
+      - kong
+    networks:
+      - template-network
+  default-service:
+    build: .
+    environment:
+      - PORT=5044
+      - IP_ADDRESS=0.0.0.0
+      - DATABASE_URL=mongodb://root:1@mongo:27017/embay/?authSource=admin
+      - BACKUP_DATABASE_URL=mongodb://mongo:27017/embay
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - KAFKA_URL=kafka:9092
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      
+    networks:
+      - template-network
+    ports:
+      - '5044:5044'
+    volumes:
+      - shared-data:/app/uploads
+  asset-service:
+    build: .
+    environment:
+      - PORT=5043
+      - IP_ADDRESS=0.0.0.0
+      - DATABASE_URL=mongodb://root:1@mongo:27017/embay?authSource=admin
+      - BACKUP_DATABASE_URL=mongodb://mongo:27017/embay
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - KAFKA_URL=kafka:9092
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+    networks:
+      - template-network
+    ports:
+      - '5043:5043'
+    volumes:
+      - shared-data:/app/uploads
+volumes:
+  shared-data: null
+networks:
+  template-network:
+    external: true
