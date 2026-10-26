@@ -12,7 +12,7 @@ router
       USER_ROLES.SUPER_ADMIN,
       USER_ROLES.ADMIN,
       USER_ROLES.USER,
-      USER_ROLES.VENDOR,
+      USER_ROLES.ARTISAN,
     ),
     LikeController.getMyLike,
   );
@@ -24,7 +24,7 @@ router
       USER_ROLES.SUPER_ADMIN,
       USER_ROLES.ADMIN,
       USER_ROLES.USER,
-      USER_ROLES.VENDOR,
+      USER_ROLES.ARTISAN,
     ),
     LikeController.toggleLikeToDB,
   )

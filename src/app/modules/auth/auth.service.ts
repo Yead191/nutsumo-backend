@@ -386,7 +386,7 @@ const registerVendorToDB = async (payload: any, res: Response) => {
 
     const createVendor = await User.create({
       ...payload,
-      role: USER_ROLES.VENDOR,
+      role: USER_ROLES.ARTISAN,
       status: 'pending',
     });
     if (!createVendor) {

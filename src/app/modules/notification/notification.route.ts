@@ -7,7 +7,7 @@ const router = express.Router();
 
 router.route('/')
     .get(
-        auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN, USER_ROLES.USER, USER_ROLES.VENDOR),
+        auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN, USER_ROLES.USER, USER_ROLES.ARTISAN),
         NotificationController.getAllNotifications
     )
     .post(
@@ -15,7 +15,7 @@ router.route('/')
         NotificationController.createNotification
     )
     .patch(
-        auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN, USER_ROLES.USER, USER_ROLES.VENDOR),
+        auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN, USER_ROLES.USER, USER_ROLES.ARTISAN),
         NotificationController.readAllNotifications
     );
 
@@ -25,7 +25,7 @@ router.delete(
     USER_ROLES.SUPER_ADMIN,
     USER_ROLES.ADMIN,
     USER_ROLES.USER,
-    USER_ROLES.VENDOR,
+    USER_ROLES.ARTISAN,
   ),
   NotificationController.clearAllNotifications,
 );
@@ -33,15 +33,15 @@ router.delete(
 router.route('/:id')
 
     .get(
-        auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN, USER_ROLES.USER, USER_ROLES.VENDOR),
+        auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN, USER_ROLES.USER, USER_ROLES.ARTISAN),
         NotificationController.getSingleNotification
     )
     .patch(
-        auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN, USER_ROLES.USER, USER_ROLES.VENDOR),
+        auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN, USER_ROLES.USER, USER_ROLES.ARTISAN),
         NotificationController.readSingleNotification
     )
     .delete(
-        auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN, USER_ROLES.USER, USER_ROLES.VENDOR),
+        auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN, USER_ROLES.USER, USER_ROLES.ARTISAN),
         NotificationController.deleteNotification
     );
 

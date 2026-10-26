@@ -17,7 +17,7 @@ const dispatchBlogPublishedNotification = (blog: any) => {
   if (!blog || !blog.title || !blog.slug) return;
   sendNotificationToAllUsers({
     title: `New Article: ${blog.title}`,
-    message: `A new article "${blog.title}" has been published on iFundAyiti.`,
+    message: `A new article "${blog.title}" has been published on Nutsumo.`,
     path: `/blogs/${blog.slug}`,
     refId: blog._id,
     type: 'blog',
