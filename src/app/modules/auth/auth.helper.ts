@@ -20,7 +20,7 @@ const unverifiedAccountHandle = async (email: string, response: Response) => {
   const createAccountTemplate = emailTemplate.createAccount(values);
   emailHelper.sendEmail(createAccountTemplate);
   response.status(400).json({
-    success: true,
+    success: false,
     statusCode: 400,
     message: "Account is not verified. Please check your email for verification code.",
     suggestRoute: "/api/v1/auth/verify-email",

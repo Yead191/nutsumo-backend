@@ -1,25 +1,6 @@
 import { Model, Types } from 'mongoose';
 import { USER_ROLES } from '../../../enums/user';
 
-export interface IVendorProfile {
-  jobTitle: string;
-  contactNo: string;
-  company: string;
-  bio: string;
-  expertise: string[];
-  yearsExperience: string;
-  degree?: string;
-  linkedin?: string;
-  hourlyRate: number;
-  availability: string;
-  consultationTypes: string[];
-
-  applicationStatus: 'pending' | 'approved' | 'rejected';
-  approvedAt?: Date;
-  rejectedReason?: string;
-  isProfileVisible?: boolean;
-}
-
 export interface IUser {
   name: string;
   email: string;
@@ -38,14 +19,6 @@ export interface IUser {
 
   mustChangePassword: boolean;
   phone?: string;
-
-  company?: string;
-
-  // Regular User Only
-  interest?: string;
-
-  // Vendor Only
-  vendorProfile?: IVendorProfile;
 
   // Identity Verification (NID Front, Back & Selfie)
   idCardFront?: string;

@@ -51,12 +51,12 @@ const loginUserFromDB = async (payload: ILoginData, res: Response) => {
     );
   }
 
-  if (isExistUser.status === 'pending') {
-    throw new ApiError(
-      StatusCodes.BAD_REQUEST,
-      'Your application has been submitted successfully. We will review your application and notify you via email once it has been approved.',
-    );
-  }
+  // if (isExistUser.status === 'pending') {
+  //   throw new ApiError(
+  //     StatusCodes.BAD_REQUEST,
+  //     'Your application has been submitted successfully. We will review your application and notify you via email once it has been approved.',
+  //   );
+  // }
   if (isExistUser.status === 'rejected') {
     throw new ApiError(
       StatusCodes.BAD_REQUEST,
@@ -95,7 +95,14 @@ const loginUserFromDB = async (payload: ILoginData, res: Response) => {
     config.jwt.jwt_expire_in as string,
   );
 
-  return { createToken };
+  return {
+    createToken,
+    role: isExistUser.role,
+    identityStatus: isExistUser.identityStatus || 'not_submitted',
+    email: isExistUser.email,
+    name: isExistUser.name,
+    verified: isExistUser.verified,
+  };
 };
 
 //forget password
@@ -320,7 +327,8 @@ const changePasswordToDB = async (
 };
 
 const registerUserToDB = async (payload: IRegisterData, res: Response) => {
-  const { name, email, password, company, interest, role, phone, trade } = payload;
+  const { name, email, password, company, interest, role, phone, trade } =
+    payload;
   const isExist = await User.findOne({ email: payload.email });
   if (isExist) {
     if (isExist.status === 'blocked')
@@ -343,8 +351,6 @@ const registerUserToDB = async (payload: IRegisterData, res: Response) => {
     role: isArtisan ? USER_ROLES.ARTISAN : USER_ROLES.USER,
     phone: phone || '',
     trade: trade || '',
-    company: company || '',
-    interest: interest || '',
     verified: false,
     status: isArtisan ? 'pending' : 'active',
     identityStatus: isArtisan ? 'not_submitted' : undefined,
