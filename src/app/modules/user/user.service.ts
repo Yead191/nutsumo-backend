@@ -106,11 +106,24 @@ const updateProfileToDB = async (
 };
 
 const getAllUsersFromDB = async (query: Record<string, any>) => {
-  // const userQuery = new QueryBuilder(User.find({ role: { $nin: [USER_ROLES.ADMIN, USER_ROLES.SUPER_ADMIN] }, verified: true }), query).paginate().sort().search(['name', 'email']).filter().fields()
-  const filter: Record<string, any> = {
-    role: USER_ROLES.USER,
-    verified: true,
-  };
+  const filter: Record<string, any> = {};
+
+  if (query.role) {
+    filter.role = query.role;
+    delete query.role;
+  } else {
+    filter.role = { $nin: [USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN] };
+  }
+
+  if (query.identityStatus) {
+    filter.identityStatus = query.identityStatus;
+    delete query.identityStatus;
+  }
+
+  if (query.verified !== undefined) {
+    filter.verified = query.verified === 'true' || query.verified === true;
+    delete query.verified;
+  }
 
   if (query.hasSubscription === 'true') {
     filter.subscription = { $exists: true, $ne: null };
@@ -245,6 +258,8 @@ const changeStatusOfUser = async (
   id: string,
   status?: string,
   rejectionReason?: string,
+  identityStatus?: string,
+  identityRejectionReason?: string,
 ) => {
   if (!mongoose.Types.ObjectId.isValid(id)) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid user id');
@@ -256,22 +271,34 @@ const changeStatusOfUser = async (
     throw new ApiError(StatusCodes.NOT_FOUND, "User doesn't exist!");
   }
 
-  let updateStatus = status;
-  if (!updateStatus) {
-    updateStatus = isExistUser.status === 'active' ? 'blocked' : 'active';
+  const updateData: Record<string, any> = {};
+
+  if (status) {
+    updateData.status = status;
+    // Rejection reason is only allowed for blocked/rejected users
+    if (status === 'blocked' || status === 'rejected') {
+      if (rejectionReason !== undefined) {
+        updateData.rejectionReason = rejectionReason;
+      }
+    } else {
+      updateData.rejectionReason = '';
+    }
+  } else if (!identityStatus) {
+    updateData.status = isExistUser.status === 'active' ? 'blocked' : 'active';
   }
 
-  const updateData: Record<string, any> = {
-    status: updateStatus,
-  };
-
-  // Rejection reason is only allowed for blocked/rejected users
-  if (updateStatus === 'blocked' || updateStatus === 'rejected') {
-    if (rejectionReason !== undefined) {
-      updateData.rejectionReason = rejectionReason;
+  if (identityStatus) {
+    updateData.identityStatus = identityStatus;
+    if (identityStatus === 'verified') {
+      updateData.verified = true;
+      updateData.identityRejectionReason = '';
+      if (!status) {
+        updateData.status = 'active';
+      }
+    } else if (identityStatus === 'needs_update') {
+      updateData.identityRejectionReason =
+        identityRejectionReason || rejectionReason || '';
     }
-  } else {
-    updateData.rejectionReason = '';
   }
 
   const result = await User.findByIdAndUpdate(
@@ -297,12 +324,19 @@ const updateUserByAdmin = async (id: string, payload: Partial<IUser>) => {
   const allowedFields = [
     'name',
     'email',
+    'phone',
     'role',
+    'trade',
     'status',
     'verified',
     'company',
     'interest',
     'rejectionReason',
+    'identityStatus',
+    'identityRejectionReason',
+    'idCardFront',
+    'idCardBack',
+    'selfie',
   ];
   const updateData: Record<string, any> = {};
 
@@ -313,6 +347,10 @@ const updateUserByAdmin = async (id: string, payload: Partial<IUser>) => {
   }
   if (payload.status !== 'blocked' && payload.status !== 'rejected') {
     updateData.rejectionReason = '';
+  }
+  if (payload.identityStatus === 'verified') {
+    updateData.identityRejectionReason = '';
+    updateData.verified = true;
   }
 
   const result = await User.findByIdAndUpdate(

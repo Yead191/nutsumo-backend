@@ -110,6 +110,48 @@ const loginWithGoogle = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const verifyIdentity = catchAsync(async (req: Request, res: Response) => {
+  const idCardFront = getSingleFilePath(req.files, 'nidFront');
+  const idCardBack = getSingleFilePath(req.files, 'nidBack');
+  const selfie = getSingleFilePath(req.files, 'selfie');
+
+  const userId = (req as any).user?.id || (req as any).user?._id;
+  const email = req.body?.email || (req as any).user?.email;
+
+  const result = await AuthService.verifyIdentityToDB({
+    userId,
+    email,
+    idCardFront,
+    idCardBack,
+    selfie,
+  });
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message:
+      'Identity verification documents submitted successfully! Your application is under review.',
+    data: result,
+  });
+});
+
+const getIdentityStatus = catchAsync(async (req: Request, res: Response) => {
+  const userId = (req as any).user?.id || (req as any).user?._id;
+  const email = (req.query?.email as string) || (req as any).user?.email;
+
+  const result = await AuthService.getIdentityStatusFromDB({
+    userId,
+    email,
+  });
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Identity status fetched successfully.',
+    data: result,
+  });
+});
+
 export const AuthController = {
   verifyEmail,
   loginUser,
@@ -119,4 +161,7 @@ export const AuthController = {
   changePassword,
   registerUser,
   registerVendor,
+  verifyIdentity,
+  getIdentityStatus,
 };
+

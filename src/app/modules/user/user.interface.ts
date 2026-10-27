@@ -47,6 +47,14 @@ export interface IUser {
   // Vendor Only
   vendorProfile?: IVendorProfile;
 
+  // Identity Verification (NID Front, Back & Selfie)
+  idCardFront?: string;
+  idCardBack?: string;
+  selfie?: string;
+  trade?: string;
+  identityStatus?: 'not_submitted' | 'pending' | 'verified' | 'needs_update';
+  identityRejectionReason?: string;
+
   authentication?: {
     isResetPassword: boolean;
     oneTimeCode: number;

@@ -46,6 +46,11 @@ const updateUserByAdminZodSchema = z.object({
     interest: z.string().optional(),
     rejectionReason: z.string().optional(),
     phone: z.string().optional(),
+    trade: z.string().optional(),
+    identityStatus: z
+      .enum(['not_submitted', 'pending', 'verified', 'needs_update'])
+      .optional(),
+    identityRejectionReason: z.string().optional(),
   }),
 });
 
@@ -54,6 +59,10 @@ const changeStatusZodSchema = z.object({
     .object({
       status: z.enum(['active', 'blocked', 'rejected', 'pending']).optional(),
       rejectionReason: z.string().optional(),
+      identityStatus: z
+        .enum(['not_submitted', 'pending', 'verified', 'needs_update'])
+        .optional(),
+      identityRejectionReason: z.string().optional(),
     })
     .optional(),
 });

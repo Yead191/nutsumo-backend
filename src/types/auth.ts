@@ -26,6 +26,8 @@ export type IRegisterData = {
   email: string
   password: string
   role?: USER_ROLES
+  phone?: string
+  trade?: string
   company?: string
   interest?: string
 }

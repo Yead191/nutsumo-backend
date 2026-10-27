@@ -56,4 +56,16 @@ router.post(
   AuthController.registerVendor,
 );
 
+router.post(
+  '/verify-identity',
+  fileUploadHandler([
+    { name: 'nidFront' },
+    { name: 'nidBack' },
+    { name: 'selfie' },
+  ]),
+  AuthController.verifyIdentity,
+);
+
+router.get('/identity-status', AuthController.getIdentityStatus);
+
 export const AuthRoutes = router;

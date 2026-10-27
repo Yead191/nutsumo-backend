@@ -19,6 +19,7 @@ import cryptoToken from '../../../util/cryptoToken';
 import generateOTP from '../../../util/generateOTP';
 import { ResetToken } from '../resetToken/resetToken.model';
 import { User } from '../user/user.model';
+import { IUser } from '../user/user.interface';
 import { Response } from 'express';
 import { AuthHelper } from './auth.helper';
 import { USER_ROLES } from '../../../enums/user';
@@ -157,6 +158,25 @@ const verifyEmailToDB = async (payload: IVerifyEmail) => {
       { verified: true, authentication: { oneTimeCode: null, expireAt: null } },
     );
     message = 'Email verified successfully';
+
+    // Generate token so verified user can proceed directly
+    const createToken = jwtHelper.createToken(
+      {
+        id: isExistUser._id,
+        role: isExistUser.role,
+        email: isExistUser.email,
+        name: isExistUser.name,
+      },
+      config.jwt.jwt_secret as Secret,
+      config.jwt.jwt_expire_in as string,
+    );
+
+    data = {
+      createToken,
+      role: isExistUser.role,
+      identityStatus: isExistUser.identityStatus || 'not_submitted',
+      status: isExistUser.status,
+    };
 
     // Send Welcome Email
     const welcomeEmailData = emailTemplate.welcomeAccount({
@@ -300,7 +320,7 @@ const changePasswordToDB = async (
 };
 
 const registerUserToDB = async (payload: IRegisterData, res: Response) => {
-  const { name, email, password, company, interest } = payload;
+  const { name, email, password, company, interest, role, phone, trade } = payload;
   const isExist = await User.findOne({ email: payload.email });
   if (isExist) {
     if (isExist.status === 'blocked')
@@ -314,23 +334,28 @@ const registerUserToDB = async (payload: IRegisterData, res: Response) => {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Email already exist!');
   }
 
-  const data = {
+  const isArtisan = role === USER_ROLES.ARTISAN;
+
+  const data: Partial<IUser> = {
     name,
     email,
     password,
-    role: USER_ROLES.USER,
-    company,
-    interest,
+    role: isArtisan ? USER_ROLES.ARTISAN : USER_ROLES.USER,
+    phone: phone || '',
+    trade: trade || '',
+    company: company || '',
+    interest: interest || '',
     verified: false,
-    status: 'active',
+    status: isArtisan ? 'pending' : 'active',
+    identityStatus: isArtisan ? 'not_submitted' : undefined,
   };
   const createUser = await User.create(data);
   if (!createUser) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Failed to create user');
   }
   NotificationServices.sendNotificationToAdmins({
-    title: 'New User Registration',
-    message: `${createUser.name} has registered as a new user`,
+    title: isArtisan ? 'New Artisan Registration' : 'New User Registration',
+    message: `${createUser.name} has registered as a new ${isArtisan ? 'Artisan' : 'user'}`,
     refId: createUser._id,
     path: `/user/${createUser._id}`,
   });
@@ -543,6 +568,85 @@ const loginWithGoogleToDB = async (idToken: string) => {
   return { createToken };
 };
 
+// Verify Identity Documents (National ID Front, Back, and Selfie)
+const verifyIdentityToDB = async (payload: {
+  userId?: string;
+  email?: string;
+  idCardFront?: string;
+  idCardBack?: string;
+  selfie?: string;
+}) => {
+  const { userId, email, idCardFront, idCardBack, selfie } = payload;
+  const query = userId ? { _id: userId } : { email };
+  const user = await User.findOne(query);
+
+  if (!user) {
+    throw new ApiError(StatusCodes.NOT_FOUND, "User doesn't exist!");
+  }
+
+  if (!idCardFront && !user.idCardFront) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'National ID card front side photo is required',
+    );
+  }
+  if (!idCardBack && !user.idCardBack) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'National ID card back side photo is required',
+    );
+  }
+  if (!selfie && !user.selfie) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'Live selfie photo is required for identity verification',
+    );
+  }
+
+  const updatedData: Record<string, any> = {
+    identityStatus: 'pending',
+    status: 'pending',
+    identityRejectionReason: '',
+  };
+
+  if (idCardFront) updatedData.idCardFront = idCardFront;
+  if (idCardBack) updatedData.idCardBack = idCardBack;
+  if (selfie) updatedData.selfie = selfie;
+
+  const result = await User.findByIdAndUpdate(
+    user._id,
+    { $set: updatedData },
+    { new: true },
+  ).select('-password -authentication');
+
+  NotificationServices.sendNotificationToAdmins({
+    title: 'New Artisan Identity Verification Submitted',
+    message: `${user.name} has submitted ID cards and a live selfie for review`,
+    refId: user._id,
+    path: `/user/${user._id}`,
+  });
+
+  return result;
+};
+
+// Get Identity Status
+const getIdentityStatusFromDB = async (payload: {
+  userId?: string;
+  email?: string;
+}) => {
+  const { userId, email } = payload;
+  const query = userId ? { _id: userId } : { email };
+  const user = await User.findOne(query).select(
+    'name email role status identityStatus identityRejectionReason idCardFront idCardBack selfie trade',
+  );
+
+  if (!user) {
+    throw new ApiError(StatusCodes.NOT_FOUND, "User doesn't exist!");
+  }
+
+  return user;
+};
+
 export const AuthService = {
   verifyEmailToDB,
   loginUserFromDB,
@@ -552,4 +656,6 @@ export const AuthService = {
   changePasswordToDB,
   registerUserToDB,
   registerVendorToDB,
+  verifyIdentityToDB,
+  getIdentityStatusFromDB,
 };

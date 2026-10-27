@@ -96,16 +96,19 @@ const getSingleUser = catchAsync(async (req: Request, res: Response) => {
 // change status
 const changeStatusOfUser = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { status, rejectionReason } = req.body || {};
+  const { status, rejectionReason, identityStatus, identityRejectionReason } =
+    req.body || {};
   const result = await UserService.changeStatusOfUser(
     id,
     status,
     rejectionReason,
+    identityStatus,
+    identityRejectionReason,
   );
   return sendResponse(res, {
     success: true,
     statusCode: StatusCodes.OK,
-    message: `User status changed to ${result?.status}`,
+    message: `User status updated successfully`,
     data: result,
   });
 });

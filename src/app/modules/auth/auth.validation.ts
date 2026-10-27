@@ -71,6 +71,8 @@ const createRegisterUserZodSchema = z.object({
       .min(8, 'Password must be at least 8 characters'),
 
     phone: z.string().optional(),
+    role: z.enum([USER_ROLES.USER, USER_ROLES.ARTISAN]).optional(),
+    trade: z.string().optional(),
   }),
 });
 

@@ -66,6 +66,33 @@ const userSchema = new Schema<IUser, UserModal>(
       type: Schema.Types.ObjectId,
       ref: 'Subscription',
     },
+
+    // Identity Verification (NID Front, Back & Selfie)
+    idCardFront: {
+      type: String,
+      default: '',
+    },
+    idCardBack: {
+      type: String,
+      default: '',
+    },
+    selfie: {
+      type: String,
+      default: '',
+    },
+    trade: {
+      type: String,
+      default: '',
+    },
+    identityStatus: {
+      type: String,
+      enum: ['not_submitted', 'pending', 'verified', 'needs_update'],
+      default: 'not_submitted',
+    },
+    identityRejectionReason: {
+      type: String,
+      default: '',
+    },
     authentication: {
       type: {
         isResetPassword: {
