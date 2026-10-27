@@ -12,8 +12,20 @@ router
   .route('/')
   .post(
     auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN),
-    validateRequest(ServiceCategoryValidation.createCategoryZodSchema),
     fileUploadHandler(),
+    (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      if (req.body?.data) {
+        try {
+          const parsed = JSON.parse(req.body.data);
+          req.body = { ...parsed, ...req.body };
+          delete req.body.data;
+        } catch (e) {
+          // ignore
+        }
+      }
+      next();
+    },
+    validateRequest(ServiceCategoryValidation.createCategoryZodSchema),
     ServiceCategoryController.createCategory,
   )
   .get(ServiceCategoryController.getAllCategories);
@@ -24,6 +36,18 @@ router
   .patch(
     auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN),
     fileUploadHandler(),
+    (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      if (req.body?.data) {
+        try {
+          const parsed = JSON.parse(req.body.data);
+          req.body = { ...parsed, ...req.body };
+          delete req.body.data;
+        } catch (e) {
+          // ignore
+        }
+      }
+      next();
+    },
     validateRequest(ServiceCategoryValidation.updateCategoryZodSchema),
     ServiceCategoryController.updateCategory,
   )

@@ -173,6 +173,8 @@ const getUserStatsFromDB = async () => {
     unverifiedUsers,
     roleCounts,
     newThisMonth,
+    pendingVerifications,
+    verifiedArtisans,
   ] = await Promise.all([
     User.countDocuments({
       role: { $nin: [USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN] },
@@ -205,10 +207,18 @@ const getUserStatsFromDB = async () => {
       createdAt: { $gte: startOfMonth },
       role: { $ne: USER_ROLES.SUPER_ADMIN },
     }),
+    User.countDocuments({
+      identityStatus: 'pending',
+    }),
+    User.countDocuments({
+      role: USER_ROLES.ARTISAN,
+      identityStatus: 'verified',
+    }),
   ]);
 
   const roles: Record<string, number> = {
     USER: 0,
+    ARTISAN: 0,
     VENDOR: 0,
     ADMIN: 0,
   };
@@ -226,8 +236,11 @@ const getUserStatsFromDB = async () => {
     verifiedUsers,
     unverifiedUsers,
     regularUsers: roles.USER || 0,
+    artisans: roles.ARTISAN || 0,
     vendors: roles.VENDOR || 0,
     admins: roles.ADMIN || 0,
+    pendingVerifications,
+    verifiedArtisans,
     newThisMonth,
   };
 };
