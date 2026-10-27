@@ -18,9 +18,19 @@ import { CommunityRoutes } from '../app/modules/community/community/community.ro
 import { CommunityLikeRoutes } from '../app/modules/community/communityLike/communityLike.route';
 import { CommunityCommentRoutes } from '../app/modules/community/communityComment/communityComment.route';
 import { CommentRoutes } from '../app/modules/blogs/comment/comment.route';
+import { ServiceCategoryRoutes } from '../app/modules/serviceCategory/serviceCategory.route';
+import { PortfolioRoutes } from '../app/modules/portfolio/portfolio.route';
 const router = express.Router();
 
 const apiRoutes = [
+  {
+    path: '/service-category',
+    route: ServiceCategoryRoutes,
+  },
+  {
+    path: '/portfolio',
+    route: PortfolioRoutes,
+  },
   {
     path: '/user',
     route: UserRoutes,

@@ -28,6 +28,20 @@ export interface IUser {
   identityStatus?: 'not_submitted' | 'pending' | 'verified' | 'needs_update';
   identityRejectionReason?: string;
 
+  // Professional Artisan Profile Fields
+  businessName?: string;
+  bio?: string;
+  location?: string;
+  experienceYears?: number;
+  availabilityStatus?: 'Available' | 'Booked' | 'Unavailable';
+  services?: Array<{
+    category: Types.ObjectId;
+    serviceName: string;
+    rateType: 'hourly' | 'daily';
+    rate: number;
+    description?: string;
+  }>;
+
   authentication?: {
     isResetPassword: boolean;
     oneTimeCode: number;

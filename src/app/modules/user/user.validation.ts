@@ -9,14 +9,35 @@ const createUserZodSchema = z.object({
   }),
 });
 
-const updateUserZodSchema = z.object({
-  name: z.string().optional(),
-  contact: z.string().optional(),
-  email: z.string().optional(),
-  password: z.string().optional(),
-  location: z.string().optional(),
-  image: z.string().optional(),
-});
+const updateUserZodSchema = z
+  .object({
+    name: z.string().optional(),
+    contact: z.string().optional(),
+    phone: z.string().optional(),
+    email: z.string().optional(),
+    password: z.string().optional(),
+    location: z.string().optional(),
+    image: z.string().optional(),
+    trade: z.string().optional(),
+    businessName: z.string().optional(),
+    bio: z.string().optional(),
+    experienceYears: z.number().optional(),
+    availabilityStatus: z
+      .enum(['Available', 'Booked', 'Unavailable'])
+      .optional(),
+    services: z
+      .array(
+        z.object({
+          category: z.string({ required_error: 'Category is required' }),
+          serviceName: z.string({ required_error: 'Service name is required' }),
+          rateType: z.enum(['hourly', 'daily']),
+          rate: z.number().min(0),
+          description: z.string().optional(),
+        }),
+      )
+      .optional(),
+  })
+  .passthrough();
 
 const updateProfileVisibilityZodSchema = z.object({
   body: z.object({

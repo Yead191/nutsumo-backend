@@ -58,10 +58,9 @@ const getUserProfileFromDB = async (
   user: JwtPayload,
 ): Promise<Partial<IUser>> => {
   const { id } = user;
-  const isExistUser = await User.findOne({ _id: id }).populate(
-    'subscription',
-    // 'name start_date end_date status is_trial plan',
-  );
+  const isExistUser = await User.findOne({ _id: id })
+    .populate('subscription')
+    .populate('services.category');
   if (!isExistUser) {
     throw new ApiError(StatusCodes.BAD_REQUEST, "User doesn't exist!");
   }
@@ -84,9 +83,16 @@ const updateProfileToDB = async (
   // Root fields
   if (payload.name !== undefined) updateData.name = payload.name;
   if (payload.image !== undefined) updateData.image = payload.image;
-  if (payload.company !== undefined) updateData.company = payload.company;
-  if (payload.interest !== undefined) updateData.interest = payload.interest;
   if (payload.phone !== undefined) updateData.phone = payload.phone;
+
+  // Professional Artisan Profile Fields
+  if (payload.trade !== undefined) updateData.trade = payload.trade;
+  if (payload.businessName !== undefined) updateData.businessName = payload.businessName;
+  if (payload.bio !== undefined) updateData.bio = payload.bio;
+  if (payload.location !== undefined) updateData.location = payload.location;
+  if (payload.experienceYears !== undefined) updateData.experienceYears = payload.experienceYears;
+  if (payload.availabilityStatus !== undefined) updateData.availabilityStatus = payload.availabilityStatus;
+  if (payload.services !== undefined) updateData.services = payload.services;
 
   //unlink file here
   if (payload.image && isExistUser.image !== payload.image) {
@@ -100,7 +106,7 @@ const updateProfileToDB = async (
       new: true,
       runValidators: true,
     },
-  );
+  ).populate('services.category');
 
   return updateDoc;
 };

@@ -14,10 +14,12 @@ router
     auth(),
     fileUploadHandler(),
     (req: Request, res: Response, next: NextFunction) => {
-      if (req.body.data) {
+      if (req.body?.data) {
         req.body = UserValidation.updateUserZodSchema.parse(
           JSON.parse(req.body.data),
         );
+      } else if (req.body && Object.keys(req.body).length > 0) {
+        req.body = UserValidation.updateUserZodSchema.parse(req.body);
       }
       return UserController.updateProfile(req, res, next);
     },

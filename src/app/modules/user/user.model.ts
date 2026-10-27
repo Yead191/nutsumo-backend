@@ -93,6 +93,59 @@ const userSchema = new Schema<IUser, UserModal>(
       type: String,
       default: '',
     },
+
+    // Professional Artisan Profile Fields
+    businessName: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    bio: {
+      type: String,
+      default: '',
+    },
+    location: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    experienceYears: {
+      type: Number,
+      default: 0,
+    },
+    availabilityStatus: {
+      type: String,
+      enum: ['Available', 'Booked', 'Unavailable'],
+      default: 'Available',
+    },
+    services: [
+      {
+        category: {
+          type: Schema.Types.ObjectId,
+          ref: 'ServiceCategory',
+          required: true,
+        },
+        serviceName: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+        rateType: {
+          type: String,
+          enum: ['hourly', 'daily'],
+          default: 'hourly',
+        },
+        rate: {
+          type: Number,
+          required: true,
+          min: 0,
+        },
+        description: {
+          type: String,
+          default: '',
+        },
+      },
+    ],
     authentication: {
       type: {
         isResetPassword: {
