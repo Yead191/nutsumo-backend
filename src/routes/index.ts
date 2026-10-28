@@ -18,14 +18,40 @@ import { CommunityRoutes } from '../app/modules/community/community/community.ro
 import { CommunityLikeRoutes } from '../app/modules/community/communityLike/communityLike.route';
 import { CommunityCommentRoutes } from '../app/modules/community/communityComment/communityComment.route';
 import { CommentRoutes } from '../app/modules/blogs/comment/comment.route';
-import { ServiceCategoryRoutes } from '../app/modules/serviceCategory/serviceCategory.route';
+import { CategoryRoutes } from '../app/modules/category/category.route';
+import { ServiceRoutes } from '../app/modules/service/service.route';
+import { ArtisanServiceRoutes } from '../app/modules/artisanService/artisanService.route';
 import { PortfolioRoutes } from '../app/modules/portfolio/portfolio.route';
 const router = express.Router();
 
 const apiRoutes = [
   {
+    path: '/category',
+    route: CategoryRoutes,
+  },
+  {
+    path: '/categories',
+    route: CategoryRoutes,
+  },
+  {
     path: '/service-category',
-    route: ServiceCategoryRoutes,
+    route: CategoryRoutes,
+  },
+  {
+    path: '/service',
+    route: ServiceRoutes,
+  },
+  {
+    path: '/services',
+    route: ServiceRoutes,
+  },
+  {
+    path: '/artisan-service',
+    route: ArtisanServiceRoutes,
+  },
+  {
+    path: '/artisan-services',
+    route: ArtisanServiceRoutes,
   },
   {
     path: '/portfolio',

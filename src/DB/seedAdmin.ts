@@ -1,5 +1,7 @@
 import { User } from '../app/modules/user/user.model';
-import { ServiceCategory } from '../app/modules/serviceCategory/serviceCategory.model';
+import { Category } from '../app/modules/category/category.model';
+import { Service } from '../app/modules/service/service.model';
+import { generateSlug } from '../app/modules/category/category.service';
 import config from '../config';
 import { USER_ROLES } from '../enums/user';
 import { logger } from '../shared/logger';
@@ -179,13 +181,42 @@ export const seedSuperAdmin = async () => {
     logger.info('✨ Super Admin account has been successfully created!');
   }
 
-  // Seed or sync default admin service categories with predefined services
+  // Seed or sync default admin categories and catalog services
   for (const cat of initialCategories) {
-    await ServiceCategory.findOneAndUpdate(
+    const categoryDoc = await Category.findOneAndUpdate(
       { slug: cat.slug },
-      { $set: cat },
+      {
+        $set: {
+          name: cat.name,
+          slug: cat.slug,
+          description: cat.description,
+          isActive: true,
+        },
+      },
       { upsert: true, new: true },
     );
+
+    if (categoryDoc && cat.services && Array.isArray(cat.services)) {
+      for (const serviceName of cat.services) {
+        const serviceSlug = generateSlug(serviceName);
+        await Service.findOneAndUpdate(
+          {
+            category: categoryDoc._id,
+            slug: serviceSlug,
+          },
+          {
+            $set: {
+              name: serviceName,
+              slug: serviceSlug,
+              category: categoryDoc._id,
+              description: `${serviceName} professional service`,
+              isActive: true,
+            },
+          },
+          { upsert: true, new: true },
+        );
+      }
+    }
   }
-  logger.info('✨ Admin Service Categories and Service lists synchronized!');
+  logger.info('✨ Admin Categories and Services catalog synchronized!');
 };

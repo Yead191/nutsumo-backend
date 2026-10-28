@@ -122,7 +122,7 @@ const userSchema = new Schema<IUser, UserModal>(
       {
         category: {
           type: Schema.Types.ObjectId,
-          ref: 'ServiceCategory',
+          ref: 'Category',
           required: true,
         },
         serviceName: {

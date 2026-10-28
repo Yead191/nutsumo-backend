@@ -73,8 +73,8 @@ const updateCategory = async (
   if (!category) {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Service category not found');
   }
-  if (payload.image && payload.image !== category.image) {
-    unlinkFile(category.image!);
+  if (category?.image && payload.image !== category.image) {
+    unlinkFile(category.image);
   }
 
   const result = await ServiceCategory.findByIdAndUpdate(id, updateData, {

@@ -61,6 +61,7 @@ app.use(
       'http://localhost:3000',
       'http://localhost:5173',
       'http://localhost:5174',
+      'http://localhost:5175',
       'http://10.10.26.173:3000',
       'http://10.10.26.173:5173',
       'https://admin.nutsumo.com',

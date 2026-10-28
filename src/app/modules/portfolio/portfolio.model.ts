@@ -36,7 +36,7 @@ const portfolioSchema = new Schema<IPortfolio, PortfolioModel>(
     },
     category: {
       type: Schema.Types.ObjectId,
-      ref: 'ServiceCategory',
+      ref: 'Category',
       required: true,
     },
     images: {
