@@ -38,5 +38,5 @@ categorySchema.index({ isActive: 1 });
 categorySchema.index({ createdAt: -1 });
 
 export const Category = model<ICategory, CategoryModel>('Category', categorySchema);
-export const ServiceCategory =
-  model<ICategory, CategoryModel>('ServiceCategory', categorySchema);
+export const ServiceCategory = Category;
+

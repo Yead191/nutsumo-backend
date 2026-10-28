@@ -1,12 +1,9 @@
-import { Model } from 'mongoose';
+import { ICategory, CategoryModel } from '../category/category.interface';
 
-export interface IServiceCategory {
-  name: string;
-  slug: string;
-  description?: string;
-  image?: string;
-  services: string[];
-  status: 'active' | 'inactive';
-}
-
-export type ServiceCategoryModel = Model<IServiceCategory>;
+/**
+ * ServiceCategory is now unified with Category module.
+ * Keeping this interface as an alias for backwards compatibility.
+ */
+export type IServiceCategory = ICategory;
+export type ServiceCategoryModel = CategoryModel;
+export { ICategory, CategoryModel };
