@@ -4,6 +4,10 @@ import { ICategory } from './category.interface';
 import { Category } from './category.model';
 import { Service } from '../service/service.model';
 import unlinkFile from '../../../shared/unlinkFile';
+import { JwtPayload } from 'jsonwebtoken';
+import { USER_ROLES } from '../../../enums/user';
+import QueryBuilder from '../../builder/QueryBuilder';
+import { promise } from 'zod';
 
 export const generateSlug = (name: string): string => {
   return name
@@ -14,7 +18,9 @@ export const generateSlug = (name: string): string => {
     .replace(/^-+|-+$/g, '');
 };
 
-const createCategory = async (payload: Partial<ICategory>): Promise<ICategory> => {
+const createCategory = async (
+  payload: Partial<ICategory>,
+): Promise<ICategory> => {
   if (!payload.name) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Category name is required');
   }
@@ -36,50 +42,28 @@ const createCategory = async (payload: Partial<ICategory>): Promise<ICategory> =
   return result;
 };
 
-const getAllCategories = async (query: Record<string, unknown> = {}) => {
-  const filter: Record<string, unknown> = {};
+const getAllCategories = async (
+  user: JwtPayload,
+  query: Record<string, any>,
+) => {
+  const initQuery = [USER_ROLES.ADMIN, USER_ROLES.SUPER_ADMIN].includes(
+    user?.role,
+  )
+    ? {}
+    : { isActive: true };
 
-  if (query.isActive !== undefined) {
-    filter.isActive = query.isActive === 'true' || query.isActive === true;
-  } else if (query.all !== 'true' && query.all !== true) {
-    // Default to active categories for public/artisan catalog
-    filter.isActive = true;
-  }
+  const qb = new QueryBuilder(Category.find(initQuery), query)
+    .search(['name'])
+    .filter()
+    .sort()
+    .paginate()
+    .fields();
+  const [categories, pagination] = await Promise.all([
+    qb.modelQuery.lean().exec(),
+    qb.getPaginationInfo(),
+  ]);
 
-  if (query.searchTerm) {
-    filter.$or = [
-      { name: { $regex: query.searchTerm, $options: 'i' } },
-      { description: { $regex: query.searchTerm, $options: 'i' } },
-    ];
-  }
-
-  const categories = await Category.find(filter).sort({ name: 1 });
-
-  // Attach services and servicesCount for rich UI experience
-  const categoryIds = categories.map(c => c._id);
-  const allServices = await Service.find({
-    category: { $in: categoryIds },
-    isActive: true,
-  }).sort({ name: 1 });
-
-  const serviceMap: Record<string, any[]> = {};
-  allServices.forEach(s => {
-    const catId = s.category.toString();
-    if (!serviceMap[catId]) serviceMap[catId] = [];
-    serviceMap[catId].push(s);
-  });
-
-  const enriched = categories.map(cat => {
-    const catServices = serviceMap[cat._id.toString()] || [];
-    return {
-      ...cat.toObject(),
-      servicesCount: catServices.length,
-      services: catServices.map(s => s.name),
-      serviceList: catServices,
-    };
-  });
-
-  return enriched;
+  return { categories, pagination };
 };
 
 const getSingleCategory = async (idOrSlug: string): Promise<any> => {
@@ -92,7 +76,9 @@ const getSingleCategory = async (idOrSlug: string): Promise<any> => {
   }
 
   // Also include services in this category
-  const services = await Service.find({ category: category._id }).sort({ name: 1 });
+  const services = await Service.find({ category: category._id }).sort({
+    name: 1,
+  });
 
   return {
     ...category.toObject(),
@@ -142,7 +128,9 @@ const deleteCategory = async (id: string): Promise<ICategory | null> => {
   }
 
   // Requirement: Protect existing references when categories are deleted
-  const associatedServicesCount = await Service.countDocuments({ category: id });
+  const associatedServicesCount = await Service.countDocuments({
+    category: id,
+  });
   if (associatedServicesCount > 0) {
     throw new ApiError(
       StatusCodes.BAD_REQUEST,

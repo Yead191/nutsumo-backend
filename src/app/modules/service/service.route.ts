@@ -5,6 +5,7 @@ import { USER_ROLES } from '../../../enums/user';
 import { ServiceController } from './service.controller';
 import { ServiceValidation } from './service.validation';
 import fileUploadHandler from '../../middlewares/fileUploadHandler';
+import tempAuth from '../../middlewares/tempAuth';
 
 const router = express.Router();
 
@@ -28,11 +29,11 @@ router
     validateRequest(ServiceValidation.createServiceZodSchema),
     ServiceController.createService,
   )
-  .get(ServiceController.getAllServices);
+  .get(tempAuth(), ServiceController.getAllServices);
 
 router
   .route('/:id')
-  .get(ServiceController.getSingleService)
+  .get(tempAuth(), ServiceController.getSingleService)
   .patch(
     auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN),
     fileUploadHandler(),

@@ -7,13 +7,19 @@ import { Category } from '../category/category.model';
 import { ArtisanService } from '../artisanService/artisanService.model';
 import { generateSlug } from '../category/category.service';
 import unlinkFile from '../../../shared/unlinkFile';
+import { JwtPayload } from 'jsonwebtoken';
+import { USER_ROLES } from '../../../enums/user';
+import QueryBuilder from '../../builder/QueryBuilder';
 
 const createService = async (payload: Partial<IService>): Promise<IService> => {
   if (!payload.name) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Service name is required');
   }
   if (!payload.category) {
-    throw new ApiError(StatusCodes.BAD_REQUEST, 'Category reference is required');
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'Category reference is required',
+    );
   }
 
   // Validate category reference exists and is active
@@ -23,7 +29,10 @@ const createService = async (payload: Partial<IService>): Promise<IService> => {
 
   const category = await Category.findById(payload.category);
   if (!category) {
-    throw new ApiError(StatusCodes.NOT_FOUND, 'Referenced category does not exist');
+    throw new ApiError(
+      StatusCodes.NOT_FOUND,
+      'Referenced category does not exist',
+    );
   }
 
   if (!category.isActive) {
@@ -54,35 +63,29 @@ const createService = async (payload: Partial<IService>): Promise<IService> => {
   return await result.populate('category');
 };
 
-const getAllServices = async (query: Record<string, unknown> = {}) => {
-  const filter: Record<string, unknown> = {};
+const getAllServices = async (
+  user: JwtPayload,
+  query: Record<string, any> = {},
+) => {
+  const initQuery = [USER_ROLES.ADMIN, USER_ROLES.SUPER_ADMIN].includes(
+    user?.role,
+  )
+    ? {}
+    : { isActive: true };
 
-  if (query.category) {
-    if (!mongoose.Types.ObjectId.isValid(query.category as string)) {
-      throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid category ID');
-    }
-    filter.category = query.category;
-  }
+  const qb = new QueryBuilder(Service.find(initQuery), query)
+    .search(['name', 'description'])
+    .filter()
+    .sort()
+    .paginate()
+    .fields();
 
-  if (query.isActive !== undefined) {
-    filter.isActive = query.isActive === 'true' || query.isActive === true;
-  } else if (query.all !== 'true' && query.all !== true) {
-    // Default to active services for public/artisan catalog
-    filter.isActive = true;
-  }
+  const [services, pagination] = await Promise.all([
+    qb.modelQuery.lean().populate('category', 'name slug isActive image'),
+    qb.getPaginationInfo(),
+  ]);
 
-  if (query.searchTerm) {
-    filter.$or = [
-      { name: { $regex: query.searchTerm, $options: 'i' } },
-      { description: { $regex: query.searchTerm, $options: 'i' } },
-    ];
-  }
-
-  const services = await Service.find(filter)
-    .populate('category', 'name slug isActive image')
-    .sort({ name: 1 });
-
-  return services;
+  return { services, pagination };
 };
 
 const getSingleService = async (id: string): Promise<IService | null> => {
@@ -115,7 +118,10 @@ const updateService = async (
 
   // If category changed, validate new category
   const targetCategory = payload.category || service.category;
-  if (payload.category && payload.category.toString() !== service.category.toString()) {
+  if (
+    payload.category &&
+    payload.category.toString() !== service.category.toString()
+  ) {
     if (!mongoose.Types.ObjectId.isValid(payload.category.toString())) {
       throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid Category ID');
     }

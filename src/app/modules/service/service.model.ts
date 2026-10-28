@@ -27,7 +27,6 @@ const serviceSchema = new Schema<IService, ServiceModel>(
     isActive: {
       type: Boolean,
       default: true,
-      index: true,
     },
     image: {
       type: String,

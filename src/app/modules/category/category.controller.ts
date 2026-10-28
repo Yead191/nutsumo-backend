@@ -21,12 +21,13 @@ const createCategory = catchAsync(async (req: Request, res: Response) => {
 });
 
 const getAllCategories = catchAsync(async (req: Request, res: Response) => {
-  const result = await CategoryServices.getAllCategories(req.query);
+  const result = await CategoryServices.getAllCategories(req.user, req.query);
   return sendResponse(res, {
     success: true,
     statusCode: StatusCodes.OK,
     message: 'Categories fetched successfully',
-    data: result,
+    data: result.categories,
+    pagination: result.pagination,
   });
 });
 

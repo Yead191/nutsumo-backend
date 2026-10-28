@@ -87,11 +87,14 @@ const updateProfileToDB = async (
 
   // Professional Artisan Profile Fields
   if (payload.trade !== undefined) updateData.trade = payload.trade;
-  if (payload.businessName !== undefined) updateData.businessName = payload.businessName;
+  if (payload.businessName !== undefined)
+    updateData.businessName = payload.businessName;
   if (payload.bio !== undefined) updateData.bio = payload.bio;
   if (payload.location !== undefined) updateData.location = payload.location;
-  if (payload.experienceYears !== undefined) updateData.experienceYears = payload.experienceYears;
-  if (payload.availabilityStatus !== undefined) updateData.availabilityStatus = payload.availabilityStatus;
+  if (payload.experienceYears !== undefined)
+    updateData.experienceYears = payload.experienceYears;
+  if (payload.availabilityStatus !== undefined)
+    updateData.availabilityStatus = payload.availabilityStatus;
   if (payload.services !== undefined) updateData.services = payload.services;
 
   //unlink file here
@@ -131,15 +134,6 @@ const getAllUsersFromDB = async (query: Record<string, any>) => {
     delete query.verified;
   }
 
-  if (query.hasSubscription === 'true') {
-    filter.subscription = { $exists: true, $ne: null };
-  }
-
-  if (query.hasSubscription === 'false') {
-    filter.subscription = { $in: [null, undefined] };
-  }
-
-  delete query.hasSubscription;
   const userQuery = new QueryBuilder(
     User.find(filter).select('-password -authentication').populate({
       path: 'subscription',
@@ -149,8 +143,8 @@ const getAllUsersFromDB = async (query: Record<string, any>) => {
     .search(['name', 'email'])
     .filter()
     .sort()
-    .paginate()
-    .fields();
+    .fields()
+    .paginate();
 
   const [users, pagination] = await Promise.all([
     userQuery.modelQuery.lean(),

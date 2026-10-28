@@ -74,6 +74,23 @@ const createArtisanService = async (
     isActive: payload.isActive !== undefined ? payload.isActive : true,
   });
 
+  // Also sync to User profile services array for seamless backward compatibility
+  try {
+    await User.findByIdAndUpdate(artisanId, {
+      $push: {
+        services: {
+          category: service.category,
+          serviceName: service.name,
+          rateType: payload.rateType === 'DAILY' ? 'daily' : 'hourly',
+          rate: payload.rateAmount,
+          description: service.description || '',
+        },
+      },
+    });
+  } catch (syncErr) {
+    // Non-blocking sync
+  }
+
   return await result.populate({
     path: 'service',
     populate: { path: 'category', select: 'name slug image isActive' },
@@ -236,6 +253,22 @@ const updateArtisanService = async (
     populate: { path: 'category', select: 'name slug image isActive' },
   });
 
+  // Sync rate changes to User.services
+  if (result && result.service && (payload.rateAmount !== undefined || payload.rateType !== undefined)) {
+    try {
+      const sName = (result.service as any).name;
+      const setObj: Record<string, any> = {};
+      if (payload.rateAmount !== undefined) setObj['services.$.rate'] = payload.rateAmount;
+      if (payload.rateType !== undefined) setObj['services.$.rateType'] = payload.rateType === 'DAILY' ? 'daily' : 'hourly';
+      await User.updateOne(
+        { _id: artisanService.artisan, 'services.serviceName': sName },
+        { $set: setObj },
+      );
+    } catch (e) {
+      // non-blocking
+    }
+  }
+
   return result;
 };
 
@@ -248,7 +281,7 @@ const deleteArtisanService = async (
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid artisan service ID');
   }
 
-  const artisanService = await ArtisanService.findById(id);
+  const artisanService = await ArtisanService.findById(id).populate('service');
   if (!artisanService) {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Artisan service selection not found');
   }
@@ -261,6 +294,18 @@ const deleteArtisanService = async (
       StatusCodes.FORBIDDEN,
       'You are not authorized to remove this service selection',
     );
+  }
+
+  // Sync remove from User.services
+  if (artisanService.service) {
+    try {
+      const sName = (artisanService.service as any).name;
+      await User.findByIdAndUpdate(artisanService.artisan, {
+        $pull: { services: { serviceName: sName } },
+      });
+    } catch (e) {
+      // non-blocking
+    }
   }
 
   const result = await ArtisanService.findByIdAndDelete(id);

@@ -26,7 +26,8 @@ const getAllServices = catchAsync(async (req: Request, res: Response) => {
     success: true,
     statusCode: StatusCodes.OK,
     message: 'Services fetched successfully',
-    data: result,
+    data: result.services,
+    pagination: result.pagination,
   });
 });
 

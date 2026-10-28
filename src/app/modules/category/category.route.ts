@@ -5,6 +5,7 @@ import { USER_ROLES } from '../../../enums/user';
 import { CategoryController } from './category.controller';
 import { CategoryValidation } from './category.validation';
 import fileUploadHandler from '../../middlewares/fileUploadHandler';
+import tempAuth from '../../middlewares/tempAuth';
 
 const router = express.Router();
 
@@ -13,7 +14,11 @@ router
   .post(
     auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN),
     fileUploadHandler(),
-    (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    (
+      req: express.Request,
+      res: express.Response,
+      next: express.NextFunction,
+    ) => {
       if (req.body?.data) {
         try {
           const parsed = JSON.parse(req.body.data);
@@ -28,15 +33,19 @@ router
     validateRequest(CategoryValidation.createCategoryZodSchema),
     CategoryController.createCategory,
   )
-  .get(CategoryController.getAllCategories);
+  .get(tempAuth(), CategoryController.getAllCategories);
 
 router
   .route('/:id')
-  .get(CategoryController.getSingleCategory)
+  .get(tempAuth(), CategoryController.getSingleCategory)
   .patch(
     auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN),
     fileUploadHandler(),
-    (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    (
+      req: express.Request,
+      res: express.Response,
+      next: express.NextFunction,
+    ) => {
       if (req.body?.data) {
         try {
           const parsed = JSON.parse(req.body.data);
