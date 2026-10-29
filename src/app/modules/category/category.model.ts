@@ -32,11 +32,10 @@ const categorySchema = new Schema<ICategory, CategoryModel>(
     timestamps: true,
   },
 );
-
-categorySchema.index({ slug: 1 });
-categorySchema.index({ isActive: 1 });
 categorySchema.index({ createdAt: -1 });
 
-export const Category = model<ICategory, CategoryModel>('Category', categorySchema);
+export const Category = model<ICategory, CategoryModel>(
+  'Category',
+  categorySchema,
+);
 export const ServiceCategory = Category;
-

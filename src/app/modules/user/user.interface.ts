@@ -34,13 +34,6 @@ export interface IUser {
   location?: string;
   experienceYears?: number;
   availabilityStatus?: 'Available' | 'Booked' | 'Unavailable';
-  services?: Array<{
-    category: Types.ObjectId;
-    serviceName: string;
-    rateType: 'hourly' | 'daily';
-    rate: number;
-    description?: string;
-  }>;
 
   authentication?: {
     isResetPassword: boolean;

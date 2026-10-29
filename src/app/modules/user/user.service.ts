@@ -95,7 +95,6 @@ const updateProfileToDB = async (
     updateData.experienceYears = payload.experienceYears;
   if (payload.availabilityStatus !== undefined)
     updateData.availabilityStatus = payload.availabilityStatus;
-  if (payload.services !== undefined) updateData.services = payload.services;
 
   //unlink file here
   if (payload.image && isExistUser.image !== payload.image) {

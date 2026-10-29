@@ -118,34 +118,7 @@ const userSchema = new Schema<IUser, UserModal>(
       enum: ['Available', 'Booked', 'Unavailable'],
       default: 'Available',
     },
-    services: [
-      {
-        category: {
-          type: Schema.Types.ObjectId,
-          ref: 'Category',
-          required: true,
-        },
-        serviceName: {
-          type: String,
-          required: true,
-          trim: true,
-        },
-        rateType: {
-          type: String,
-          enum: ['hourly', 'daily'],
-          default: 'hourly',
-        },
-        rate: {
-          type: Number,
-          required: true,
-          min: 0,
-        },
-        description: {
-          type: String,
-          default: '',
-        },
-      },
-    ],
+
     authentication: {
       type: {
         isResetPassword: {

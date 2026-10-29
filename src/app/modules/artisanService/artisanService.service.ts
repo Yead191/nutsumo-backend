@@ -15,6 +15,7 @@ const createArtisanService = async (
     rateAmount: number;
     rateType: 'HOURLY' | 'DAILY';
     isActive?: boolean;
+    description?: string;
   },
 ): Promise<IArtisanService> => {
   if (!mongoose.Types.ObjectId.isValid(artisanId)) {
@@ -33,7 +34,10 @@ const createArtisanService = async (
   // 2. Verify service exists in catalog
   const service = await Service.findById(payload.service);
   if (!service) {
-    throw new ApiError(StatusCodes.NOT_FOUND, 'Selected catalog service does not exist');
+    throw new ApiError(
+      StatusCodes.NOT_FOUND,
+      'Selected catalog service does not exist',
+    );
   }
 
   // 3. Requirement: Validate service is active
@@ -71,25 +75,9 @@ const createArtisanService = async (
     service: payload.service,
     rateAmount: payload.rateAmount,
     rateType: payload.rateType,
+    description: payload.description || '',
     isActive: payload.isActive !== undefined ? payload.isActive : true,
   });
-
-  // Also sync to User profile services array for seamless backward compatibility
-  try {
-    await User.findByIdAndUpdate(artisanId, {
-      $push: {
-        services: {
-          category: service.category,
-          serviceName: service.name,
-          rateType: payload.rateType === 'DAILY' ? 'daily' : 'hourly',
-          rate: payload.rateAmount,
-          description: service.description || '',
-        },
-      },
-    });
-  } catch (syncErr) {
-    // Non-blocking sync
-  }
 
   return await result.populate({
     path: 'service',
@@ -105,7 +93,7 @@ const getMyServices = async (artisanId: string) => {
   const services = await ArtisanService.find({ artisan: artisanId })
     .populate({
       path: 'service',
-      populate: { path: 'category', select: 'name slug image isActive' },
+      populate: { path: 'category' },
     })
     .sort({ createdAt: -1 });
 
@@ -121,17 +109,14 @@ const getArtisanServices = async (artisanId: string) => {
   const services = await ArtisanService.find({
     artisan: artisanId,
     isActive: true,
-  })
-    .populate({
-      path: 'service',
+  }).populate({
+    path: 'service',
+    match: { isActive: true },
+    populate: {
+      path: 'category',
       match: { isActive: true },
-      populate: {
-        path: 'category',
-        match: { isActive: true },
-        select: 'name slug image isActive',
-      },
-    })
-    .sort({ rateAmount: 1 });
+    },
+  });
 
   // Filter out any where service or category might be inactive
   return services.filter(s => s.service && (s.service as any).category);
@@ -163,7 +148,10 @@ const getAllArtisanServices = async (query: Record<string, unknown> = {}) => {
   }
 
   const results = await ArtisanService.find(filter)
-    .populate('artisan', 'name email profileImage trade location phoneNumber businessName identityStatus verified')
+    .populate(
+      'artisan',
+      'name email profileImage trade location phoneNumber businessName identityStatus verified',
+    )
     .populate({
       path: 'service',
       populate: { path: 'category', select: 'name slug image isActive' },
@@ -173,20 +161,28 @@ const getAllArtisanServices = async (query: Record<string, unknown> = {}) => {
   return results;
 };
 
-const getSingleArtisanService = async (id: string): Promise<IArtisanService | null> => {
+const getSingleArtisanService = async (
+  id: string,
+): Promise<IArtisanService | null> => {
   if (!mongoose.Types.ObjectId.isValid(id)) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid artisan service ID');
   }
 
   const result = await ArtisanService.findById(id)
-    .populate('artisan', 'name email profileImage trade location phoneNumber businessName identityStatus verified')
+    .populate(
+      'artisan',
+      'name email profileImage trade location phoneNumber businessName identityStatus verified',
+    )
     .populate({
       path: 'service',
       populate: { path: 'category', select: 'name slug image isActive' },
     });
 
   if (!result) {
-    throw new ApiError(StatusCodes.NOT_FOUND, 'Artisan service selection not found');
+    throw new ApiError(
+      StatusCodes.NOT_FOUND,
+      'Artisan service selection not found',
+    );
   }
 
   return result;
@@ -200,6 +196,7 @@ const updateArtisanService = async (
     rateAmount?: number;
     rateType?: 'HOURLY' | 'DAILY';
     isActive?: boolean;
+    description?: string;
   },
 ): Promise<IArtisanService | null> => {
   if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -208,11 +205,16 @@ const updateArtisanService = async (
 
   const artisanService = await ArtisanService.findById(id);
   if (!artisanService) {
-    throw new ApiError(StatusCodes.NOT_FOUND, 'Artisan service selection not found');
+    throw new ApiError(
+      StatusCodes.NOT_FOUND,
+      'Artisan service selection not found',
+    );
   }
 
   const isOwner = artisanService.artisan.toString() === userId;
-  const isAdmin = [USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN].includes(userRole as any);
+  const isAdmin = [USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN].includes(
+    userRole as any,
+  );
 
   if (!isOwner && !isAdmin) {
     throw new ApiError(
@@ -241,8 +243,11 @@ const updateArtisanService = async (
 
   // Never modifies the catalog service! Only updates the artisan's selection
   const updateData: Partial<IArtisanService> = {};
-  if (payload.rateAmount !== undefined) updateData.rateAmount = payload.rateAmount;
+  if (payload.rateAmount !== undefined)
+    updateData.rateAmount = payload.rateAmount;
   if (payload.rateType !== undefined) updateData.rateType = payload.rateType;
+  if (payload.description !== undefined)
+    updateData.description = payload.description;
   if (payload.isActive !== undefined) updateData.isActive = payload.isActive;
 
   const result = await ArtisanService.findByIdAndUpdate(id, updateData, {
@@ -254,12 +259,21 @@ const updateArtisanService = async (
   });
 
   // Sync rate changes to User.services
-  if (result && result.service && (payload.rateAmount !== undefined || payload.rateType !== undefined)) {
+  if (
+    result &&
+    result.service &&
+    (payload.rateAmount !== undefined || payload.rateType !== undefined)
+  ) {
     try {
       const sName = (result.service as any).name;
       const setObj: Record<string, any> = {};
-      if (payload.rateAmount !== undefined) setObj['services.$.rate'] = payload.rateAmount;
-      if (payload.rateType !== undefined) setObj['services.$.rateType'] = payload.rateType === 'DAILY' ? 'daily' : 'hourly';
+      if (payload.rateAmount !== undefined)
+        setObj['services.$.rate'] = payload.rateAmount;
+      if (payload.rateType !== undefined)
+        setObj['services.$.rateType'] =
+          payload.rateType === 'DAILY' ? 'daily' : 'hourly';
+      if (payload.description !== undefined)
+        setObj['services.$.description'] = payload.description;
       await User.updateOne(
         { _id: artisanService.artisan, 'services.serviceName': sName },
         { $set: setObj },
@@ -283,29 +297,22 @@ const deleteArtisanService = async (
 
   const artisanService = await ArtisanService.findById(id).populate('service');
   if (!artisanService) {
-    throw new ApiError(StatusCodes.NOT_FOUND, 'Artisan service selection not found');
+    throw new ApiError(
+      StatusCodes.NOT_FOUND,
+      'Artisan service selection not found',
+    );
   }
 
   const isOwner = artisanService.artisan.toString() === userId;
-  const isAdmin = [USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN].includes(userRole as any);
+  const isAdmin = [USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN].includes(
+    userRole as any,
+  );
 
   if (!isOwner && !isAdmin) {
     throw new ApiError(
       StatusCodes.FORBIDDEN,
       'You are not authorized to remove this service selection',
     );
-  }
-
-  // Sync remove from User.services
-  if (artisanService.service) {
-    try {
-      const sName = (artisanService.service as any).name;
-      await User.findByIdAndUpdate(artisanService.artisan, {
-        $pull: { services: { serviceName: sName } },
-      });
-    } catch (e) {
-      // non-blocking
-    }
   }
 
   const result = await ArtisanService.findByIdAndDelete(id);

@@ -20,6 +20,10 @@ const artisanServiceSchema = new Schema<IArtisanService, ArtisanServiceModel>(
       required: true,
       min: [1, 'Rate amount must be greater than zero'],
     },
+    description: {
+      type: String,
+      default: "",
+    },
     rateType: {
       type: String,
       enum: {

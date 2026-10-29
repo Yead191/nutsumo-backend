@@ -9,6 +9,7 @@ export interface IArtisanService {
   service: Types.ObjectId | IService;
   rateAmount: number;
   rateType: RateType;
+  description?: string;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
