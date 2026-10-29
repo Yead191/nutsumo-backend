@@ -23,6 +23,7 @@ import { ServiceRoutes } from '../app/modules/service/service.route';
 import { ArtisanServiceRoutes } from '../app/modules/artisanService/artisanService.route';
 import { PortfolioRoutes } from '../app/modules/portfolio/portfolio.route';
 import { ArtisanProfileRoutes } from '../app/modules/artisanProfile/artisanProfile.route';
+import { JobRoutes } from '../app/modules/job/job.route';
 const router = express.Router();
 
 const apiRoutes = [
@@ -174,6 +175,10 @@ const apiRoutes = [
   {
     path: '/community/comment',
     route: CommunityCommentRoutes,
+  },
+  {
+    path: '/job',
+    route: JobRoutes,
   },
 ];
 
