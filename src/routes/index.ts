@@ -22,6 +22,7 @@ import { CategoryRoutes } from '../app/modules/category/category.route';
 import { ServiceRoutes } from '../app/modules/service/service.route';
 import { ArtisanServiceRoutes } from '../app/modules/artisanService/artisanService.route';
 import { PortfolioRoutes } from '../app/modules/portfolio/portfolio.route';
+import { ArtisanProfileRoutes } from '../app/modules/artisanProfile/artisanProfile.route';
 const router = express.Router();
 
 const apiRoutes = [
@@ -56,6 +57,14 @@ const apiRoutes = [
   {
     path: '/portfolio',
     route: PortfolioRoutes,
+  },
+  {
+    path: '/artisan-profile',
+    route: ArtisanProfileRoutes,
+  },
+  {
+    path: '/artisan-profiles',
+    route: ArtisanProfileRoutes,
   },
   {
     path: '/user',

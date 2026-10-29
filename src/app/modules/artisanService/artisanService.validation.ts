@@ -10,7 +10,6 @@ const createArtisanServiceZodSchema = z.object({
       required_error: 'Rate type must be HOURLY or DAILY',
     }),
     description: z.string().optional(),
-    description: z.string().optional(),
     isActive: z.boolean().optional(),
   }),
 });

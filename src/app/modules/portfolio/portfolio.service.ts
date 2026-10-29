@@ -1,5 +1,6 @@
 import { StatusCodes } from 'http-status-codes';
 import ApiError from '../../../errors/ApiError';
+import unlinkFile from '../../../shared/unlinkFile';
 import { IPortfolio } from './portfolio.interface';
 import { Portfolio } from './portfolio.model';
 
@@ -13,15 +14,15 @@ const createPortfolioItem = async (
   });
 
   const result = await Portfolio.findById(newPortfolio._id)
-    .populate('category', 'name slug icon services')
-    .populate('artisan', 'name email image location phone businessName trade');
+    .populate('category', 'name slug image ')
+    .populate('artisan', 'name email image');
 
   return result as IPortfolio;
 };
 
 const getMyPortfolio = async (userId: string) => {
   const result = await Portfolio.find({ artisan: userId })
-    .populate('category', 'name slug icon services')
+    .populate('category', 'name slug image services')
     .sort({ createdAt: -1 });
 
   return result;
@@ -32,16 +33,18 @@ const getArtisanPortfolio = async (artisanId: string) => {
     artisan: artisanId,
     isPublished: true,
   })
-    .populate('category', 'name slug icon services')
+    .populate('category', 'name slug image ')
     .sort({ createdAt: -1 });
 
   return result;
 };
 
-const getSinglePortfolioItem = async (id: string): Promise<IPortfolio | null> => {
+const getSinglePortfolioItem = async (
+  id: string,
+): Promise<IPortfolio | null> => {
   const result = await Portfolio.findById(id)
-    .populate('category', 'name slug icon services')
-    .populate('artisan', 'name email image location phone businessName trade');
+    .populate('category', 'name slug image ')
+    .populate('artisan', 'name email image ');
 
   if (!result) {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Portfolio item not found');
@@ -70,7 +73,7 @@ const updatePortfolioItem = async (
   const result = await Portfolio.findByIdAndUpdate(id, payload, {
     new: true,
     runValidators: true,
-  }).populate('category', 'name slug icon services');
+  }).populate('category', 'name slug image services');
 
   return result;
 };
@@ -89,6 +92,20 @@ const deletePortfolioItem = async (
       StatusCodes.FORBIDDEN,
       'You are not authorized to delete this portfolio item',
     );
+  }
+
+  // Unlink stored image files
+  if (isExist.images && isExist.images.length > 0) {
+    for (const img of isExist.images) {
+      const url = typeof img === 'string' ? img : (img as any)?.url;
+      if (url && !url.startsWith('http')) {
+        try {
+          unlinkFile(url);
+        } catch {
+          // ignore unlink error
+        }
+      }
+    }
   }
 
   const result = await Portfolio.findByIdAndDelete(id);

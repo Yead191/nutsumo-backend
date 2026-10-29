@@ -1,5 +1,6 @@
 import { Model, Types } from 'mongoose';
 import { USER_ROLES } from '../../../enums/user';
+import { IArtisanProfile } from '../artisanProfile/artisanProfile.interface';
 
 export interface IUser {
   name: string;
@@ -19,6 +20,7 @@ export interface IUser {
 
   mustChangePassword: boolean;
   phone?: string;
+  location?: string;
 
   // Identity Verification (NID Front, Back & Selfie)
   idCardFront?: string;
@@ -28,10 +30,12 @@ export interface IUser {
   identityStatus?: 'not_submitted' | 'pending' | 'verified' | 'needs_update';
   identityRejectionReason?: string;
 
-  // Professional Artisan Profile Fields
+  // Reference to separated ArtisanProfile module
+  artisanProfile?: Types.ObjectId | IArtisanProfile;
+
+  // Backward compatibility convenience accessors (hydrated from artisanProfile)
   businessName?: string;
   bio?: string;
-  location?: string;
   experienceYears?: number;
   availabilityStatus?: 'Available' | 'Booked' | 'Unavailable';
 

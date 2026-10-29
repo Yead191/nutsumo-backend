@@ -1,7 +1,11 @@
 import { Schema, model } from 'mongoose';
-import { IPortfolio, PortfolioModel } from './portfolio.interface';
+import {
+  IPortfolio,
+  IPortfolioImage,
+  PortfolioModel,
+} from './portfolio.interface';
 
-const portfolioImageSchema = new Schema(
+const portfolioImageSchema = new Schema<IPortfolioImage>(
   {
     url: {
       type: String,
@@ -23,6 +27,7 @@ const portfolioSchema = new Schema<IPortfolio, PortfolioModel>(
       type: Schema.Types.ObjectId,
       ref: 'User',
       required: true,
+      index: true,
     },
     title: {
       type: String,
@@ -38,6 +43,7 @@ const portfolioSchema = new Schema<IPortfolio, PortfolioModel>(
       type: Schema.Types.ObjectId,
       ref: 'Category',
       required: true,
+      index: true,
     },
     images: {
       type: [portfolioImageSchema],
@@ -50,6 +56,7 @@ const portfolioSchema = new Schema<IPortfolio, PortfolioModel>(
     isPublished: {
       type: Boolean,
       default: true,
+      index: true,
     },
   },
   {
@@ -57,10 +64,9 @@ const portfolioSchema = new Schema<IPortfolio, PortfolioModel>(
   },
 );
 
-portfolioSchema.index({ artisan: 1 });
-portfolioSchema.index({ category: 1 });
-portfolioSchema.index({ isPublished: 1 });
-portfolioSchema.index({ createdAt: -1 });
+portfolioSchema.index({ artisan: 1, createdAt: -1 });
+portfolioSchema.index({ category: 1, isPublished: 1 });
+portfolioSchema.index({ title: 'text', description: 'text' });
 
 export const Portfolio = model<IPortfolio, PortfolioModel>(
   'Portfolio',

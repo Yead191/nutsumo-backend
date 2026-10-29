@@ -94,29 +94,16 @@ const userSchema = new Schema<IUser, UserModal>(
       default: '',
     },
 
-    // Professional Artisan Profile Fields
-    businessName: {
-      type: String,
-      default: '',
-      trim: true,
-    },
-    bio: {
-      type: String,
-      default: '',
-    },
     location: {
       type: String,
       default: '',
       trim: true,
     },
-    experienceYears: {
-      type: Number,
-      default: 0,
-    },
-    availabilityStatus: {
-      type: String,
-      enum: ['Available', 'Booked', 'Unavailable'],
-      default: 'Available',
+
+    // Reference to separated ArtisanProfile module
+    artisanProfile: {
+      type: Schema.Types.ObjectId,
+      ref: 'ArtisanProfile',
     },
 
     authentication: {
@@ -137,8 +124,20 @@ const userSchema = new Schema<IUser, UserModal>(
       select: 0,
     },
   },
-  { timestamps: true },
+  {
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
+  },
 );
+
+// Virtual relationship to ArtisanProfile
+userSchema.virtual('artisanProfileData', {
+  ref: 'ArtisanProfile',
+  localField: '_id',
+  foreignField: 'user',
+  justOne: true,
+});
 
 // Performance indexes
 userSchema.index({ role: 1, status: 1 });

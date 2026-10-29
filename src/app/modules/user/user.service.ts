@@ -8,6 +8,7 @@ import unlinkFile from '../../../shared/unlinkFile';
 import generateOTP from '../../../util/generateOTP';
 import { IUser } from './user.interface';
 import { User } from './user.model';
+import { ArtisanProfile } from '../artisanProfile/artisanProfile.model';
 import { AuthHelper } from '../auth/auth.helper';
 import { Response } from 'express';
 import mongoose from 'mongoose';
@@ -60,12 +61,41 @@ const getUserProfileFromDB = async (
   const { id } = user;
   const isExistUser = await User.findOne({ _id: id })
     .populate('subscription')
-    .populate('services.category');
+    .populate('artisanProfile');
+
   if (!isExistUser) {
     throw new ApiError(StatusCodes.BAD_REQUEST, "User doesn't exist!");
   }
 
-  return isExistUser;
+  // If user is an artisan and has no artisanProfile linked yet, auto-create/link
+  if (isExistUser.role === USER_ROLES.ARTISAN && !isExistUser.artisanProfile) {
+    let profile = await ArtisanProfile.findOne({ user: id });
+    if (!profile) {
+      profile = await ArtisanProfile.create({
+        user: id,
+        businessName: isExistUser.name ? `${isExistUser.name} Services` : '',
+        trade: isExistUser.trade || '',
+        location: isExistUser.location || '',
+        availabilityStatus: 'Available',
+      });
+    }
+    await User.findByIdAndUpdate(id, { $set: { artisanProfile: profile._id } });
+    (isExistUser as any).artisanProfile = profile;
+  }
+
+  // Ensure backward compatibility: decorate top-level fields from artisanProfile if present
+  const userObj: any = isExistUser.toObject ? isExistUser.toObject() : isExistUser;
+  if (userObj.artisanProfile && typeof userObj.artisanProfile === 'object') {
+    const ap = userObj.artisanProfile;
+    if (ap.businessName && !userObj.businessName) userObj.businessName = ap.businessName;
+    if (ap.bio && !userObj.bio) userObj.bio = ap.bio;
+    if (ap.experienceYears !== undefined && userObj.experienceYears === undefined)
+      userObj.experienceYears = ap.experienceYears;
+    if (ap.availabilityStatus)
+      userObj.availabilityStatus = ap.availabilityStatus;
+  }
+
+  return userObj;
 };
 
 const updateProfileToDB = async (
@@ -80,25 +110,45 @@ const updateProfileToDB = async (
 
   const updateData: Record<string, any> = {};
 
-  // Root fields
+  // Common User & Artisan Fields
   if (payload.name !== undefined) updateData.name = payload.name;
   if (payload.image !== undefined) updateData.image = payload.image;
   if (payload.phone !== undefined) updateData.phone = payload.phone;
-
-  // Professional Artisan Profile Fields
-  if (payload.trade !== undefined) updateData.trade = payload.trade;
-  if (payload.businessName !== undefined)
-    updateData.businessName = payload.businessName;
-  if (payload.bio !== undefined) updateData.bio = payload.bio;
   if (payload.location !== undefined) updateData.location = payload.location;
-  if (payload.experienceYears !== undefined)
-    updateData.experienceYears = payload.experienceYears;
-  if (payload.availabilityStatus !== undefined)
-    updateData.availabilityStatus = payload.availabilityStatus;
+  if (payload.trade !== undefined) updateData.trade = payload.trade;
 
   //unlink file here
   if (payload.image && isExistUser.image !== payload.image) {
     unlinkFile(isExistUser.image!);
+  }
+
+  // Pass professional artisan fields to ArtisanProfile module
+  const artisanFields: Record<string, any> = {};
+  if (payload.businessName !== undefined)
+    artisanFields.businessName = payload.businessName;
+  if (payload.bio !== undefined) artisanFields.bio = payload.bio;
+  if (payload.location !== undefined) artisanFields.location = payload.location;
+  if (payload.trade !== undefined) artisanFields.trade = payload.trade;
+  if (payload.experienceYears !== undefined)
+    artisanFields.experienceYears = payload.experienceYears;
+  if (payload.availabilityStatus !== undefined)
+    artisanFields.availabilityStatus = payload.availabilityStatus;
+
+  if (
+    Object.keys(artisanFields).length > 0 ||
+    isExistUser.role === USER_ROLES.ARTISAN
+  ) {
+    const updatedProfile = await ArtisanProfile.findOneAndUpdate(
+      { user: id },
+      { $set: artisanFields },
+      {
+        new: true,
+        upsert: true,
+        runValidators: true,
+        setDefaultsOnInsert: true,
+      },
+    );
+    updateData.artisanProfile = updatedProfile._id;
   }
 
   const updateDoc = await User.findOneAndUpdate(
@@ -108,9 +158,20 @@ const updateProfileToDB = async (
       new: true,
       runValidators: true,
     },
-  ).populate('services.category');
+  )
+    .populate('subscription')
+    .populate('artisanProfile');
 
-  return updateDoc;
+  const resultObj: any = updateDoc?.toObject ? updateDoc.toObject() : updateDoc;
+  if (resultObj?.artisanProfile && typeof resultObj.artisanProfile === 'object') {
+    const ap = resultObj.artisanProfile;
+    if (ap.businessName) resultObj.businessName = ap.businessName;
+    if (ap.bio) resultObj.bio = ap.bio;
+    if (ap.experienceYears !== undefined) resultObj.experienceYears = ap.experienceYears;
+    if (ap.availabilityStatus) resultObj.availabilityStatus = ap.availabilityStatus;
+  }
+
+  return resultObj;
 };
 
 const getAllUsersFromDB = async (query: Record<string, any>) => {
@@ -134,9 +195,10 @@ const getAllUsersFromDB = async (query: Record<string, any>) => {
   }
 
   const userQuery = new QueryBuilder(
-    User.find(filter).select('-password -authentication').populate({
-      path: 'subscription',
-    }),
+    User.find(filter)
+      .select('-password -authentication')
+      .populate('subscription')
+      .populate('artisanProfile'),
     query,
   )
     .search(['name', 'email'])
@@ -251,11 +313,14 @@ const getUserService = async (user: JwtPayload, id: any) => {
   if (isAdmin) {
     result = await User.findById(id)
       .select('-password -authentication')
-      .populate('subscription');
+      .populate('subscription')
+      .populate('artisanProfile');
   } else {
-    result = await User.findById(id).select(
-      'name email role company interest verified status image createdAt',
-    );
+    result = await User.findById(id)
+      .select(
+        'name email role location trade verified status image createdAt artisanProfile',
+      )
+      .populate('artisanProfile');
   }
 
   if (!result) {
