@@ -1,4 +1,3 @@
-import { initJobMatchingWorker } from './app/modules/job-matching/jobMatching.worker';
 import mongoose from "mongoose";
 import app from "./app";
 import config from "./config";
@@ -62,8 +61,8 @@ export async function main() {
         global.httpServer = server;
         global.socketServer = io;
 
-        // Initialize background queue workers
-        initJobMatchingWorker();
+        // Initialize Kafka consumers
+        await loadConsumer();
 
         // Notify master that worker is ready
         if (cluster.worker) {

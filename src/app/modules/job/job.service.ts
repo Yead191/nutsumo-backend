@@ -15,7 +15,7 @@ import QueryBuilder from '../../builder/QueryBuilder';
 import unlinkFile from '../../../shared/unlinkFile';
 import { JwtPayload } from 'jsonwebtoken';
 import { USER_ROLES } from '../../../enums/user';
-import { dispatchJobMatchingTask } from '../job-matching/jobMatching.queue';
+import { publishJobCreatedEvent } from '../job-matching/jobMatching.producer';
 
 interface IJobFilters {
   status?: JobStatus;
@@ -72,8 +72,8 @@ const createJob = async (customerId: string, payload: Partial<IJob>) => {
 
     const job = await Job.create(jobData);
 
-    // Asynchronously dispatch job matching and notifications via background queue (Non-blocking)
-    await dispatchJobMatchingTask({
+    // Asynchronously publish job created event to Kafka (Non-blocking)
+    await publishJobCreatedEvent({
       jobId: String(job._id),
       jobTitle: job.title,
     });

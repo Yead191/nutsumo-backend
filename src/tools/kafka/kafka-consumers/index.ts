@@ -1,6 +1,10 @@
-import { userConsumer } from "./user.consumer";
+import { userConsumer } from './user.consumer';
+import { initJobMatchingConsumer } from '../../../app/modules/job-matching/jobMatching.consumer';
 
 export async function loadConsumer() {
-    await Promise.all([userConsumer()]);
-    console.log("consumer loaded");
+  await Promise.all([
+    userConsumer(),
+    initJobMatchingConsumer(),
+  ]);
+  console.log('Kafka consumers initialized');
 }

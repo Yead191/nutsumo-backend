@@ -6,7 +6,9 @@ import { JOB_STATUSES } from '../job/job.constants';
 import { Service } from '../service/service.model';
 import { ArtisanService } from '../artisanService/artisanService.model';
 import { ArtisanProfile } from '../artisanProfile/artisanProfile.model';
-import { IJobMatch } from './jobmatching.interface';
+import { IJobMatch, IJobMatchingJobData } from './jobmatching.interface';
+import { NotificationServices } from '../notification/notification.service';
+import { logger } from '../../../shared/logger';
 
 const normalize = (value?: string | null) => value?.trim().toLowerCase() ?? '';
 
@@ -159,6 +161,52 @@ const getJobMatches = async (jobId: string): Promise<IJobMatch[]> => {
   );
 };
 
+/**
+ * Executes matching for a given job and sends batch notifications + socket events.
+ */
+const executeJobMatchingAndNotification = async (data: IJobMatchingJobData) => {
+  const { jobId, jobTitle } = data;
+  const startTime = Date.now();
+
+  logger.info(`[JobMatching] Finding matches for Job: ${jobId}`);
+
+  const matches = await getJobMatches(jobId);
+
+  if (!matches || matches.length === 0) {
+    logger.info(`[JobMatching] No matching artisans found for Job: ${jobId}`);
+    return { jobId, matchedCount: 0, notificationsSent: 0 };
+  }
+
+  logger.info(
+    `[JobMatching] Found ${matches.length} matching artisans for Job: ${jobId}`,
+  );
+
+  const notifications = matches.map(match => ({
+    receiver: match.artisan,
+    title: 'New job available',
+    message: `A new job "${jobTitle || 'New job'}" matches your service.`,
+    refId: new Types.ObjectId(jobId),
+    path: `/jobs/${jobId}`,
+    seen: false,
+  }));
+
+  const createdNotifications =
+    await NotificationServices.createBulkNotifications(notifications);
+
+  const durationMs = Date.now() - startTime;
+  logger.info(
+    `[JobMatching] Delivered ${createdNotifications.length} notifications for Job: ${jobId} in ${durationMs}ms`,
+  );
+
+  return {
+    jobId,
+    matchedCount: matches.length,
+    notificationsSent: createdNotifications.length,
+    durationMs,
+  };
+};
+
 export const JobMatchingServices = {
   getJobMatches,
+  executeJobMatchingAndNotification,
 };
