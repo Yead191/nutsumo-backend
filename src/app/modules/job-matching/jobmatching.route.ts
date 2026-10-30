@@ -1,5 +1,5 @@
 import express from 'express';
-import { JobMatchingController } from './jobmatching.controller';
+import { JobMatchingController } from './jobMatching.controller';
 
 const router = express.Router();
 

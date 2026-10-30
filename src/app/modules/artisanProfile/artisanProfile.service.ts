@@ -27,6 +27,7 @@ const upsertMyArtisanProfile = async (
     'trade',
     'bio',
     'location',
+    'postCode',
     'experienceYears',
     'availabilityStatus',
     'hourlyRate',
@@ -60,6 +61,7 @@ const upsertMyArtisanProfile = async (
   };
   if (updateData.trade) userUpdates.trade = updateData.trade;
   if (updateData.location) userUpdates.location = updateData.location;
+  if (updateData.postCode !== undefined) userUpdates.postCode = updateData.postCode;
 
   await User.findByIdAndUpdate(userId, { $set: userUpdates });
 
@@ -90,6 +92,7 @@ const getMyArtisanProfile = async (
       businessName: user.name ? `${user.name} Services` : '',
       trade: user.trade || '',
       location: (user as any).location || '',
+      postCode: '',
       availabilityStatus: 'Available',
     });
 
@@ -149,6 +152,7 @@ const getArtisanProfileByUserId = async (
       businessName: user.name ? `${user.name} Services` : '',
       trade: user.trade || '',
       location: (user as any).location || '',
+      postCode: '',
       availabilityStatus: 'Available',
     });
 

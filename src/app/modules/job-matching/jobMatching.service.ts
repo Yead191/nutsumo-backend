@@ -1,6 +1,5 @@
 import { Types } from 'mongoose';
 import { StatusCodes } from 'http-status-codes';
-
 import ApiError from '../../../errors/ApiError';
 import { Job } from '../job/job.model';
 import { JOB_STATUSES } from '../job/job.constants';

@@ -76,6 +76,7 @@ const artisanProfileSchema = new Schema<IArtisanProfile, ArtisanProfileModel>(
       default: true,
     },
     postCode: {
+      index: true,
       type: String,
       trim: true,
     },
@@ -93,6 +94,7 @@ artisanProfileSchema.index({
   trade: 'text',
   bio: 'text',
   location: 'text',
+  postCode: 'text',
 });
 artisanProfileSchema.index({ availabilityStatus: 1, rating: -1 });
 

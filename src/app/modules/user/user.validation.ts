@@ -17,6 +17,7 @@ const updateUserZodSchema = z
     email: z.string().optional(),
     password: z.string().optional(),
     location: z.string().optional(),
+    postCode: z.string().optional(),
     image: z.string().optional(),
     trade: z.string().optional(),
     businessName: z.string().optional(),

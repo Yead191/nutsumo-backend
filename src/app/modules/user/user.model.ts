@@ -100,6 +100,12 @@ const userSchema = new Schema<IUser, UserModal>(
       trim: true,
     },
 
+    postCode: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+
     // Reference to separated ArtisanProfile module
     artisanProfile: {
       type: Schema.Types.ObjectId,

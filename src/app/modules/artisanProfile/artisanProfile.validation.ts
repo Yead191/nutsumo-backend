@@ -6,6 +6,7 @@ const createArtisanProfileZodSchema = z.object({
     trade: z.string().optional(),
     bio: z.string().optional(),
     location: z.string().optional(),
+    postCode: z.string().optional(),
     experienceYears: z.number().min(0).optional(),
     availabilityStatus: z
       .enum(['Available', 'Booked', 'Unavailable'])
@@ -22,6 +23,7 @@ const updateArtisanProfileZodSchema = z.object({
     trade: z.string().optional(),
     bio: z.string().optional(),
     location: z.string().optional(),
+    postCode: z.string().optional(),
     experienceYears: z.number().min(0).optional(),
     availabilityStatus: z
       .enum(['Available', 'Booked', 'Unavailable'])

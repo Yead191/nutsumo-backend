@@ -15,6 +15,8 @@ import QueryBuilder from '../../builder/QueryBuilder';
 import unlinkFile from '../../../shared/unlinkFile';
 import { JwtPayload } from 'jsonwebtoken';
 import { USER_ROLES } from '../../../enums/user';
+import { JobMatchingServices } from '../job-matching/jobMatching.service';
+import { NotificationServices } from '../notification/notification.service';
 
 interface IJobFilters {
   status?: JobStatus;
@@ -69,7 +71,12 @@ const createJob = async (customerId: string, payload: Partial<IJob>) => {
       postCode: payload.postCode ?? '',
     };
 
-    return Job.create(jobData);
+    const job = await Job.create(jobData);
+    const mathces = await JobMatchingServices.getJobMatches(String(job._id))
+    await Promise.all(
+      mathces.map(match => NotificationServices)
+    )
+
   } catch (error) {
     if (payload.images && payload.images.length > 0) {
       for (const img of payload.images) {
@@ -127,8 +134,8 @@ const getAllJobs = async (user: JwtPayload, query: Record<string, any>) => {
   )
     ? {}
     : {
-        status: JOB_STATUSES.OPEN,
-      };
+      status: JOB_STATUSES.OPEN,
+    };
 
   const qb = new QueryBuilder(
     Job.find(initQuery).populate([

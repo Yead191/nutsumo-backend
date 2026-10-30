@@ -93,6 +93,8 @@ const getUserProfileFromDB = async (
       userObj.experienceYears = ap.experienceYears;
     if (ap.availabilityStatus)
       userObj.availabilityStatus = ap.availabilityStatus;
+    if (ap.postCode !== undefined)
+      userObj.postCode = ap.postCode;
   }
 
   return userObj;
@@ -116,6 +118,7 @@ const updateProfileToDB = async (
   if (payload.phone !== undefined) updateData.phone = payload.phone;
   if (payload.location !== undefined) updateData.location = payload.location;
   if (payload.trade !== undefined) updateData.trade = payload.trade;
+  if (payload.postCode !== undefined) updateData.postCode = payload.postCode;
 
   //unlink file here
   if (payload.image && isExistUser.image !== payload.image) {
@@ -133,6 +136,8 @@ const updateProfileToDB = async (
     artisanFields.experienceYears = payload.experienceYears;
   if (payload.availabilityStatus !== undefined)
     artisanFields.availabilityStatus = payload.availabilityStatus;
+  if (payload.postCode !== undefined)
+    artisanFields.postCode = payload.postCode;
 
   if (
     Object.keys(artisanFields).length > 0 ||
@@ -169,6 +174,7 @@ const updateProfileToDB = async (
     if (ap.bio) resultObj.bio = ap.bio;
     if (ap.experienceYears !== undefined) resultObj.experienceYears = ap.experienceYears;
     if (ap.availabilityStatus) resultObj.availabilityStatus = ap.availabilityStatus;
+    if (ap.postCode !== undefined) resultObj.postCode = ap.postCode;
   }
 
   return resultObj;

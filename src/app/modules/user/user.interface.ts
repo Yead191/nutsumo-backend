@@ -21,6 +21,7 @@ export interface IUser {
   mustChangePassword: boolean;
   phone?: string;
   location?: string;
+  postCode?: string;
 
   // Identity Verification (NID Front, Back & Selfie)
   idCardFront?: string;
