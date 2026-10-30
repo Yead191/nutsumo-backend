@@ -1,5 +1,8 @@
 import { model, Schema } from 'mongoose';
-import { IArtisanProfile, ArtisanProfileModel } from './artisanProfile.interface';
+import {
+  IArtisanProfile,
+  ArtisanProfileModel,
+} from './artisanProfile.interface';
 
 const artisanProfileSchema = new Schema<IArtisanProfile, ArtisanProfileModel>(
   {
@@ -72,6 +75,10 @@ const artisanProfileSchema = new Schema<IArtisanProfile, ArtisanProfileModel>(
       type: Boolean,
       default: true,
     },
+    postCode: {
+      type: String,
+      trim: true,
+    },
   },
   {
     timestamps: true,
@@ -81,7 +88,12 @@ const artisanProfileSchema = new Schema<IArtisanProfile, ArtisanProfileModel>(
 );
 
 // Search indexes for artisan discovery
-artisanProfileSchema.index({ businessName: 'text', trade: 'text', bio: 'text', location: 'text' });
+artisanProfileSchema.index({
+  businessName: 'text',
+  trade: 'text',
+  bio: 'text',
+  location: 'text',
+});
 artisanProfileSchema.index({ availabilityStatus: 1, rating: -1 });
 
 export const ArtisanProfile = model<IArtisanProfile, ArtisanProfileModel>(

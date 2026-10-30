@@ -10,6 +10,7 @@ export interface IArtisanProfile {
   trade?: string;
   bio?: string;
   location?: string;
+  postCode?: string;
   experienceYears?: number;
   availabilityStatus: AvailabilityStatus;
   hourlyRate?: number;
