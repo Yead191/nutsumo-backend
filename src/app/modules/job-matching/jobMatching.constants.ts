@@ -1,1 +1,7 @@
+export const JOB_MATCHING_QUEUE_NAME = 'JOB_MATCHING_QUEUE';
+
+export const JOB_MATCHING_EVENTS = {
+  MATCH_AND_NOTIFY: 'MATCH_AND_NOTIFY',
+} as const;
+
 export const JOBMATCHING_CONSTANT = 'someValue';

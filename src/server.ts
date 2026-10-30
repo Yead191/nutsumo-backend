@@ -1,3 +1,4 @@
+import { initJobMatchingWorker } from './app/modules/job-matching/jobMatching.worker';
 import mongoose from "mongoose";
 import app from "./app";
 import config from "./config";
@@ -60,6 +61,9 @@ export async function main() {
         // Store in global for graceful shutdown
         global.httpServer = server;
         global.socketServer = io;
+
+        // Initialize background queue workers
+        initJobMatchingWorker();
 
         // Notify master that worker is ready
         if (cluster.worker) {

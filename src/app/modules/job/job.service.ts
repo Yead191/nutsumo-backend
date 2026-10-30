@@ -15,8 +15,7 @@ import QueryBuilder from '../../builder/QueryBuilder';
 import unlinkFile from '../../../shared/unlinkFile';
 import { JwtPayload } from 'jsonwebtoken';
 import { USER_ROLES } from '../../../enums/user';
-import { JobMatchingServices } from '../job-matching/jobMatching.service';
-import { NotificationServices } from '../notification/notification.service';
+import { dispatchJobMatchingTask } from '../job-matching/jobMatching.queue';
 
 interface IJobFilters {
   status?: JobStatus;
@@ -72,10 +71,14 @@ const createJob = async (customerId: string, payload: Partial<IJob>) => {
     };
 
     const job = await Job.create(jobData);
-    const mathces = await JobMatchingServices.getJobMatches(String(job._id))
-    await Promise.all(
-      mathces.map(match => NotificationServices)
-    )
+
+    // Asynchronously dispatch job matching and notifications via background queue (Non-blocking)
+    await dispatchJobMatchingTask({
+      jobId: String(job._id),
+      jobTitle: job.title,
+    });
+
+    return job;
 
   } catch (error) {
     if (payload.images && payload.images.length > 0) {

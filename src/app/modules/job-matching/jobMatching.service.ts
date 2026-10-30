@@ -6,10 +6,11 @@ import { JOB_STATUSES } from '../job/job.constants';
 import { Service } from '../service/service.model';
 import { ArtisanService } from '../artisanService/artisanService.model';
 import { ArtisanProfile } from '../artisanProfile/artisanProfile.model';
+import { IJobMatch } from './jobmatching.interface';
 
 const normalize = (value?: string | null) => value?.trim().toLowerCase() ?? '';
 
-const getJobMatches = async (jobId: string) => {
+const getJobMatches = async (jobId: string): Promise<IJobMatch[]> => {
   if (!Types.ObjectId.isValid(jobId)) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid job ID');
   }
@@ -130,9 +131,9 @@ const getJobMatches = async (jobId: string) => {
 
     return [
       {
-        artisan: item.artisan,
-        artisanService: item._id,
-        service: item.service,
+        artisan: item.artisan as Types.ObjectId,
+        artisanService: item._id as Types.ObjectId,
+        service: item.service as Types.ObjectId,
         rateAmount: item.rateAmount,
         rateType: item.rateType,
         matchScore,
@@ -142,7 +143,7 @@ const getJobMatches = async (jobId: string) => {
   });
 
   // Keep the highest-scoring service match for each artisan.
-  const uniqueMatches = new Map<string, (typeof matches)[number]>();
+  const uniqueMatches = new Map<string, IJobMatch>();
 
   for (const match of matches) {
     const artisanId = String(match.artisan);

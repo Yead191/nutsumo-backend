@@ -1,3 +1,4 @@
+import { Types } from 'mongoose';
 import { Notification } from './notification.model';
 import QueryBuilder from '../../builder/QueryBuilder';
 import { INotification } from './notification.interface';
@@ -11,6 +12,34 @@ const createNotification = async (data: INotification) => {
   const io = global.socketServer;
   const result = await Notification.create(data);
   io?.emit(`getNotification::${data.receiver}`, result);
+  return result;
+};
+
+const createBulkNotifications = async (
+  notifications: Array<
+    Partial<INotification> & {
+      receiver: Types.ObjectId;
+      title: string;
+      refId: Types.ObjectId;
+      path: string;
+    }
+  >,
+) => {
+  if (!notifications || notifications.length === 0) {
+    return [];
+  }
+
+  // 1. Single database round-trip batch insert
+  const result = await Notification.insertMany(notifications);
+
+  // 2. Real-time broadcast to each connected recipient
+  const io = global.socketServer;
+  if (io) {
+    for (const notif of result) {
+      io.emit(`getNotification::${notif.receiver}`, notif);
+    }
+  }
+
   return result;
 };
 
@@ -134,6 +163,7 @@ const clearAllNotifications = async (user: JwtPayload) => {
 
 export const NotificationServices = {
   createNotification,
+  createBulkNotifications,
   sendNotificationToAdmins,
   getAllNotifications,
   getSingleNotification,
