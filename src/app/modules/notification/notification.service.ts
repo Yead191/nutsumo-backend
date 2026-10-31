@@ -7,8 +7,16 @@ import { StatusCodes } from 'http-status-codes';
 import { User } from '../user/user.model';
 import { USER_ROLES } from '../../../enums/user';
 import { JwtPayload } from 'jsonwebtoken';
+import { kafkaProducer } from '../../../tools/kafka/kafka-producers/kafka.producer';
 
 const createNotification = async (data: INotification) => {
+  await kafkaProducer.sendMessage('utils', {
+    type: 'SEND_NOTIFICATION',
+    data,
+  });
+};
+
+const saveNotification = async (data: INotification) => {
   const io = global.socketServer;
   const result = await Notification.create(data);
   io?.emit(`getNotification::${data.receiver}`, result);
@@ -172,4 +180,5 @@ export const NotificationServices = {
   readSingleNotification,
   readAllNotifications,
   clearAllNotifications,
+  saveNotification,
 };

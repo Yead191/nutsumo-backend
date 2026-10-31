@@ -119,7 +119,7 @@ const forgetPasswordToDB = async (email: string) => {
     email: isExistUser.email,
   };
   const forgetPassword = emailTemplate.resetPassword(value);
-  emailHelper.sendEmail(forgetPassword);
+  await emailHelper.sendEmail(forgetPassword);
 
   //save to DB
   const authentication = {
@@ -373,7 +373,7 @@ const registerUserToDB = async (payload: IRegisterData, res: Response) => {
     email: createUser.email!,
   };
   const createAccountTemplate = emailTemplate.createAccount(values);
-  emailHelper.sendEmail(createAccountTemplate);
+  await emailHelper.sendEmail(createAccountTemplate);
 
   //save to DB
   const authentication = {

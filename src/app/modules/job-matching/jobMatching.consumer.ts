@@ -5,6 +5,7 @@ import { logger, errorLogger } from '../../../shared/logger';
 import { IJobMatchingJobData } from './jobmatching.interface';
 import { kafkaConsumer } from '../../../tools/kafka/kafka-producers/kafka.consumer';
 import { JobMatchingServices } from './jobmatching.service';
+import { NotificationServices } from '../notification/notification.service';
 
 let consumer: Consumer | null = null;
 
@@ -62,6 +63,9 @@ export const initJobMatchingConsumer = async (): Promise<void> => {
         switch (type) {
           case 'JOB_CREATED':
             await JobMatchingServices.executeJobMatchingAndNotification(data);
+            break;
+
+          default:
             break;
         }
       },

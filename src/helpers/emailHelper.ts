@@ -2,6 +2,7 @@ import nodemailer from 'nodemailer';
 import config from '../config';
 import { errorLogger, logger } from '../shared/logger';
 import { ISendEmail } from '../types/email';
+import { kafkaProducer } from '../tools/kafka/kafka-producers/kafka.producer';
 
 const transporter = nodemailer.createTransport({
   host: config.email.host,
@@ -19,6 +20,24 @@ const transporter = nodemailer.createTransport({
 } as any);
 
 const sendEmail = async (values: ISendEmail) => {
+  await kafkaProducer.sendMessage('utils', {
+    type: 'SEND_EMAIL',
+    data: values,
+  });
+};
+
+// Transporter for order-related emails
+const orderTransporter = nodemailer.createTransport({
+  host: config.email.order_host,
+  port: Number(config.email.order_port),
+  secure: false,
+  auth: {
+    user: config.email.order_user,
+    pass: config.email.order_pass,
+  },
+});
+
+const setEmailINQueue = async (values: ISendEmail) => {
   try {
     const info = await transporter.sendMail({
       from: `${config.project_name} <${config.email.from}>`,
@@ -35,16 +54,6 @@ const sendEmail = async (values: ISendEmail) => {
   }
 };
 
-// Transporter for order-related emails
-const orderTransporter = nodemailer.createTransport({
-  host: config.email.order_host,
-  port: Number(config.email.order_port),
-  secure: false,
-  auth: {
-    user: config.email.order_user,
-    pass: config.email.order_pass,
-  },
-});
 const sendOrderEmail = async (values: ISendEmail) => {
   try {
     const info = await orderTransporter.sendMail({
@@ -62,4 +71,5 @@ const sendOrderEmail = async (values: ISendEmail) => {
 export const emailHelper = {
   sendEmail,
   sendOrderEmail,
+  setEmailINQueue,
 };
