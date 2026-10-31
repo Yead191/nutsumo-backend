@@ -24,6 +24,8 @@ import { ArtisanServiceRoutes } from '../app/modules/artisanService/artisanServi
 import { PortfolioRoutes } from '../app/modules/portfolio/portfolio.route';
 import { ArtisanProfileRoutes } from '../app/modules/artisanProfile/artisanProfile.route';
 import { JobRoutes } from '../app/modules/job/job.route';
+import { QuotationRoutes } from '../app/modules/quotation/quotation.route';
+import { BookingRoutes } from '../app/modules/booking/booking.route';
 const router = express.Router();
 
 const apiRoutes = [
@@ -179,6 +181,26 @@ const apiRoutes = [
   {
     path: '/job',
     route: JobRoutes,
+  },
+  {
+    path: '/jobs',
+    route: JobRoutes,
+  },
+  {
+    path: '/quotation',
+    route: QuotationRoutes,
+  },
+  {
+    path: '/quotations',
+    route: QuotationRoutes,
+  },
+  {
+    path: '/booking',
+    route: BookingRoutes,
+  },
+  {
+    path: '/bookings',
+    route: BookingRoutes,
   },
 ];
 

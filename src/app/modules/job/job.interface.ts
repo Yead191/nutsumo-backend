@@ -20,6 +20,9 @@ export interface IJob {
 
   status: JobStatus;
 
+  selectedQuotation?: Types.ObjectId | null;
+  selectedArtisan?: Types.ObjectId | null;
+
   createdAt: Date;
   updatedAt: Date;
   images?: string[];

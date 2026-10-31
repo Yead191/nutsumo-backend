@@ -4,7 +4,7 @@ import { logger, errorLogger } from '../../../shared/logger';
 
 import { IJobMatchingJobData } from './jobmatching.interface';
 import { kafkaConsumer } from '../../../tools/kafka/kafka-producers/kafka.consumer';
-import { JobMatchingServices } from './jobmatching.service';
+import { JobMatchingServices } from './jobMatching.service';
 import { NotificationServices } from '../notification/notification.service';
 
 let consumer: Consumer | null = null;
@@ -63,6 +63,24 @@ export const initJobMatchingConsumer = async (): Promise<void> => {
         switch (type) {
           case 'JOB_CREATED':
             await JobMatchingServices.executeJobMatchingAndNotification(data);
+            break;
+
+          case 'QUOTATION_CREATED':
+            logger.info(
+              `[Kafka Consumer] Received QUOTATION_CREATED for Job: ${data.jobId} by Artisan: ${data.artisanName}`,
+            );
+            break;
+
+          case 'QUOTATION_ACCEPTED':
+            logger.info(
+              `[Kafka Consumer] Received QUOTATION_ACCEPTED for Booking: ${data.bookingNumber} (Job: ${data.jobId})`,
+            );
+            break;
+
+          case 'QUOTATION_REJECTED':
+            logger.info(
+              `[Kafka Consumer] Received QUOTATION_REJECTED for Job: ${data.jobId}`,
+            );
             break;
 
           default:

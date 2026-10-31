@@ -331,4 +331,45 @@ export type IEventBookingAdminNotification = {
   quantity?: number;
 };
 
+export type IQuotationReceivedEmail = {
+  customerName: string;
+  customerEmail: string;
+  artisanName: string;
+  jobTitle: string;
+  jobId: string;
+  proposedAmount: number;
+  rateType: string;
+  estimatedDuration?: string;
+  message: string;
+};
 
+export type IQuotationAcceptedEmail = {
+  artisanName: string;
+  artisanEmail: string;
+  customerName: string;
+  customerPhone?: string;
+  jobTitle: string;
+  jobId: string;
+  bookingNumber: string;
+  agreedAmount: number;
+  rateType: string;
+};
+
+export type IBookingConfirmedCustomerEmail = {
+  customerName: string;
+  customerEmail: string;
+  artisanName: string;
+  artisanPhone?: string;
+  jobTitle: string;
+  jobId: string;
+  bookingNumber: string;
+  agreedAmount: number;
+  rateType: string;
+};
+
+export type IQuotationRejectedEmail = {
+  artisanName: string;
+  artisanEmail: string;
+  jobTitle: string;
+  reason?: string;
+};

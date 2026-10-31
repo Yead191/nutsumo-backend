@@ -22,6 +22,13 @@ import {
   subscriptionCancelled,
 } from '../templates/subscriptionTemplate';
 
+import {
+  quotationReceivedCustomerEmail,
+  quotationAcceptedArtisanEmail,
+  bookingConfirmedCustomerEmail,
+  quotationRejectedArtisanEmail,
+} from '../templates/quotationTemplate';
+
 export const emailTemplate = {
   createAccount,
   resetPassword,
@@ -38,4 +45,10 @@ export const emailTemplate = {
   subscriptionPaymentSuccess,
   subscriptionPaymentFailed,
   subscriptionCancelled,
+
+  quotationReceivedCustomerEmail,
+  quotationAcceptedArtisanEmail,
+  bookingConfirmedCustomerEmail,
+  quotationRejectedArtisanEmail,
 };
+

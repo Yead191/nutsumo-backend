@@ -79,6 +79,16 @@ const jobSchema = new Schema<IJob, JobModel>(
       type: String,
       trim: true,
     },
+    selectedQuotation: {
+      type: Schema.Types.ObjectId,
+      ref: 'Quotation',
+      default: null,
+    },
+    selectedArtisan: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
   },
   {
     timestamps: true,

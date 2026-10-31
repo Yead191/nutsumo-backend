@@ -1,0 +1,693 @@
+====================================================================================================
+               NUTSUMO SERVICE MARKETPLACE - JOB POST TO BOOKING WORKFLOW GUIDE
+====================================================================================================
+
+Target: Frontend Web Developers (Customer, Artisan & Admin Dashboard Pages)
+Base URL: http://localhost:5000/api/v1 (or your production API URL)
+Auth Headers: Authorization: Bearer <ACCESS_TOKEN>
+
+----------------------------------------------------------------------------------------------------
+1. PROJECT OVERVIEW & LIFECYCLE ARCHITECTURE
+----------------------------------------------------------------------------------------------------
+Nutsumo connects Customers (Service Seekers) with Verified Artisans / Pros (Service Providers).
+The core monetization and workflow lifecycle transitions from a Job Request to a Confirmed Booking:
+
+  [Customer Posts Job] 
+         │ (Status: OPEN)
+         ▼
+  [Automated Matching Engine]
+         │ (Matches Category/Service & Location -> Emits Kafka Event)
+         ▼
+  [Real-Time Notifications & Emails to Matched Artisans]
+         ▼
+  [Artisan Views Job & Submits Quotation / Proposal]
+         │ (Quotation Status: PENDING)
+         ▼
+  [Customer Receives Quotation -> Reviews All Proposals]
+         ▼
+  [Customer Accepts Best Quotation] ──(ATOMIC MONGODB TRANSACTION)──┐
+         │                                                          │
+         ├─► Selected Quotation: ACCEPTED                           │
+         ├─► Job Status: BOOKED                                     │
+         ├─► All Other Pending Quotations: REJECTED (with reason)   │
+         ├─► New Booking Created: CONFIRMED (Booking #BK-XXXX-XXXX) │
+         └─► Kafka Events, Sockets & Email Confirmations Dispatched ─┘
+         ▼
+  [Confirmed Booking Details Screen / Chat / Execution]
+
+Key Status Enums:
+  - Job Status: 'OPEN' | 'BOOKED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
+  - Quotation Status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'WITHDRAWN'
+  - Rate Type: 'HOURLY' | 'DAILY' | 'FIXED'
+  - Booking Status: 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
+  - Payment Status: 'UNPAID' | 'PAID' | 'REFUNDED'
+
+
+====================================================================================================
+2. BUSINESS LOGIC & CONSTRAINTS (MUST-KNOW FOR FRONTEND)
+====================================================================================================
+1. Verified Artisan Guard:
+   - Only artisans with `role === 'ARTISAN'`, `status === 'active'`, and `identityStatus === 'verified'`
+     can submit quotations. Non-verified artisans receive 403 Forbidden. Frontend should show a verification badge/prompt.
+2. Self-Quotation Guard:
+   - A customer cannot submit a quotation to their own job.
+3. Open Job Constraint:
+   - Quotations can ONLY be submitted, updated, or accepted while `job.status === 'OPEN'`.
+4. Unique Active Quotation Rule (Compound Index `{ job: 1, artisan: 1 }`):
+   - One artisan can only have one active quotation per job.
+   - If PENDING: Frontend must route the artisan to Edit/Update proposal instead of submitting a new one.
+   - If REJECTED / ACCEPTED: Artisan cannot re-submit.
+   - If WITHDRAWN: Submitting a new quotation re-activates the existing record to PENDING with new pricing.
+5. Atomic Acceptance:
+   - When Customer clicks "Accept Offer", backend performs an atomic MongoDB transaction.
+   - The selected quote is ACCEPTED, Job becomes BOOKED, Booking is created, and all rival quotes are REJECTED.
+
+
+====================================================================================================
+3. CUSTOMER PAGES & API SPECIFICATIONS
+====================================================================================================
+
+----------------------------------------------------------------------------------------------------
+PAGE 3.1: Post a Job / Request Service ("/account/post-job")
+----------------------------------------------------------------------------------------------------
+Purpose: Customer creates a new job post with location, budget, preferred date, and optional images.
+Method: POST
+Endpoint: /api/v1/job
+Access: Customer (auth header required)
+Content-Type: multipart/form-data (or application/json if no images)
+
+Form-Data Fields:
+  - title: string (min 3, max 150)
+  - description: string (min 10, max 5000)
+  - category: string (MongoDB ObjectId of Category, optional if custom)
+  - service: string (MongoDB ObjectId of Service, optional if custom)
+  - customServiceName: string (optional, if custom service typed)
+  - location: string (e.g. "Banani, Dhaka" or "Brooklyn, NY")
+  - postCode: string (e.g. "1213" or "10001")
+  - budget: number (e.g. 150)
+  - preferredDate: string ISO (e.g. "2026-11-15T10:00:00.000Z")
+  - images: binary files (Max 10 images)
+  * Note: You can send fields individually in FormData OR as a JSON string inside `data` field + files under `images`.
+
+Sample Success Response (201 Created):
+{
+  "statusCode": 201,
+  "success": true,
+  "message": "Job created successfully",
+  "data": {
+    "_id": "6ae5587b45c428cac7e80f79",
+    "customer": "6ae0127051de26fed9d1c728",
+    "title": "Fix Leaking Kitchen Sink",
+    "description": "The kitchen sink has been leaking for a week. Need a professional plumber urgently.",
+    "category": "6ae165f30bd4d47acdc57fcb",
+    "service": "6ae165f30bd4d47acdc57fcd",
+    "customServiceName": "",
+    "location": "Banani, Dhaka",
+    "postCode": "1213",
+    "budget": 150,
+    "preferredDate": "2026-11-15T10:00:00.000Z",
+    "status": "OPEN",
+    "images": [
+      "/images/sink-leak-1-1793415291689.png",
+      "/images/sink-leak-2-1793415291690.png"
+    ],
+    "createdAt": "2026-10-31T02:54:51.749Z",
+    "updatedAt": "2026-10-31T02:54:51.749Z"
+  }
+}
+
+----------------------------------------------------------------------------------------------------
+PAGE 3.2: My Job Requests List ("/account")
+----------------------------------------------------------------------------------------------------
+Purpose: Customer views all their posted jobs, with status badges, proposal counts, and budget.
+Method: GET
+Endpoint: /api/v1/job/my-jobs?page=1&limit=10&status=OPEN
+Access: Customer
+
+Sample Success Response (200 OK):
+{
+  "statusCode": 200,
+  "success": true,
+  "message": "Jobs fetched successfully",
+  "data": [
+    {
+      "_id": "6ae5587b45c428cac7e80f79",
+      "title": "Fix Leaking Kitchen Sink",
+      "description": "The kitchen sink has been leaking for a week...",
+      "location": "Banani, Dhaka",
+      "budget": 150,
+      "preferredDate": "2026-11-15T10:00:00.000Z",
+      "status": "OPEN",
+      "category": {
+        "_id": "6ae165f30bd4d47acdc57fcb",
+        "name": "Plumbing & Sanitary"
+      },
+      "service": {
+        "_id": "6ae165f30bd4d47acdc57fcd",
+        "name": "Sink Repair & Installation",
+        "slug": "sink-repair-installation"
+      },
+      "images": ["/images/sink-leak-1-1793415291689.png"],
+      "createdAt": "2026-10-31T02:54:51.749Z"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 10,
+    "total": 1,
+    "totalPage": 1
+  }
+}
+
+----------------------------------------------------------------------------------------------------
+PAGE 3.3: Job Details & Proposals Management ("/account/jobs/:jobId")
+----------------------------------------------------------------------------------------------------
+Purpose: Customer reviews job information alongside all proposals received from artisans.
+APIs to call on this page:
+1. Job Details: GET /api/v1/job/:id
+2. Job Proposals: GET /api/v1/quotations/job/:jobId
+
+GET /api/v1/quotations/job/:jobId Success Response:
+{
+  "statusCode": 200,
+  "success": true,
+  "message": "Job quotations retrieved successfully",
+  "data": [
+    {
+      "_id": "6ae580124ed4c1e730b88f12",
+      "job": {
+        "_id": "6ae5587b45c428cac7e80f79",
+        "title": "Fix Leaking Kitchen Sink",
+        "budget": 150,
+        "location": "Banani, Dhaka",
+        "status": "OPEN"
+      },
+      "customer": "6ae0127051de26fed9d1c728",
+      "artisan": {
+        "_id": "6ae0396a5c15c7724e5cab1d",
+        "name": "Rahim Plumbing Solutions",
+        "email": "rahim@plumber.com",
+        "phone": "+8801712345678",
+        "image": "/images/rahim-avatar.png",
+        "location": "Dhaka",
+        "verified": true,
+        "artisanProfileData": {
+          "businessName": "Rahim Plumbing Solutions",
+          "trade": "Master Plumber",
+          "rating": 4.9,
+          "reviewsCount": 24,
+          "experienceYears": 6,
+          "hourlyRate": 20
+        }
+      },
+      "proposedAmount": 140,
+      "rateType": "FIXED",
+      "estimatedDuration": "2 hours",
+      "message": "Hello! I have fixed over 50 kitchen sinks with pipe replacements. Can bring all necessary parts tomorrow morning.",
+      "status": "PENDING",
+      "createdAt": "2026-10-31T04:15:00.000Z"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 10,
+    "total": 1,
+    "totalPage": 1
+  }
+}
+
+Action: Accept Quotation (Triggers booking creation and auto-rejects rival proposals)
+Method: PATCH
+Endpoint: /api/v1/quotations/:quotationId/accept
+Access: Customer (Job Owner)
+Body: None (empty object {})
+
+Sample Success Response (200 OK):
+{
+  "statusCode": 200,
+  "success": true,
+  "message": "Quotation accepted and booking confirmed successfully",
+  "data": {
+    "quotation": {
+      "_id": "6ae580124ed4c1e730b88f12",
+      "status": "ACCEPTED",
+      "acceptedAt": "2026-10-31T05:00:00.000Z",
+      "proposedAmount": 140,
+      "rateType": "FIXED"
+    },
+    "booking": {
+      "_id": "6ae591144ed4c1e730b88f99",
+      "bookingNumber": "BK-428812-7814",
+      "job": "6ae5587b45c428cac7e80f79",
+      "quotation": "6ae580124ed4c1e730b88f12",
+      "customer": "6ae0127051de26fed9d1c728",
+      "artisan": "6ae0396a5c15c7724e5cab1d",
+      "totalAmount": 140,
+      "rateType": "FIXED",
+      "status": "CONFIRMED",
+      "paymentStatus": "UNPAID",
+      "createdAt": "2026-10-31T05:00:00.000Z"
+    },
+    "job": {
+      "_id": "6ae5587b45c428cac7e80f79",
+      "title": "Fix Leaking Kitchen Sink",
+      "status": "BOOKED",
+      "selectedQuotation": "6ae580124ed4c1e730b88f12",
+      "selectedArtisan": "6ae0396a5c15c7724e5cab1d"
+    }
+  }
+}
+
+Action: Reject Quotation
+Method: PATCH
+Endpoint: /api/v1/quotations/:quotationId/reject
+Access: Customer (Job Owner)
+Body:
+{
+  "rejectReason": "Rate is higher than expected"
+}
+
+Sample Success Response:
+{
+  "statusCode": 200,
+  "success": true,
+  "message": "Quotation rejected successfully",
+  "data": {
+    "_id": "6ae580124ed4c1e730b88f12",
+    "status": "REJECTED",
+    "rejectReason": "Rate is higher than expected",
+    "rejectedAt": "2026-10-31T05:10:00.000Z"
+  }
+}
+
+----------------------------------------------------------------------------------------------------
+PAGE 3.4: Customer Bookings Screen ("/account/bookings" & "/account/bookings/:id")
+----------------------------------------------------------------------------------------------------
+Purpose: Customer views confirmed bookings, contact info of the hired artisan, and scheduled dates.
+Method: GET
+Endpoint: /api/v1/bookings/my-bookings?page=1&limit=10&status=CONFIRMED
+Access: Customer (or Artisan)
+
+Sample Success Response:
+{
+  "statusCode": 200,
+  "success": true,
+  "message": "Bookings fetched successfully",
+  "data": [
+    {
+      "_id": "6ae591144ed4c1e730b88f99",
+      "bookingNumber": "BK-428812-7814",
+      "job": {
+        "_id": "6ae5587b45c428cac7e80f79",
+        "title": "Fix Leaking Kitchen Sink",
+        "location": "Banani, Dhaka",
+        "preferredDate": "2026-11-15T10:00:00.000Z"
+      },
+      "artisan": {
+        "_id": "6ae0396a5c15c7724e5cab1d",
+        "name": "Rahim Plumbing Solutions",
+        "phone": "+8801712345678",
+        "email": "rahim@plumber.com",
+        "image": "/images/rahim-avatar.png",
+        "location": "Dhaka",
+        "verified": true
+      },
+      "totalAmount": 140,
+      "rateType": "FIXED",
+      "status": "CONFIRMED",
+      "paymentStatus": "UNPAID",
+      "createdAt": "2026-10-31T05:00:00.000Z"
+    }
+  ]
+}
+
+
+====================================================================================================
+4. ARTISAN (PRO) PAGES & API SPECIFICATIONS
+====================================================================================================
+
+----------------------------------------------------------------------------------------------------
+PAGE 4.1: Available Jobs / Matched Jobs Feed ("/pro/jobs" or "/pro/available-jobs")
+----------------------------------------------------------------------------------------------------
+Purpose: Artisan browses open jobs that match their skills, location, or search keywords.
+Method: GET
+Endpoint: /api/v1/job?status=OPEN&page=1&limit=10&searchTerm=kitchen
+Access: Artisan (or Public)
+
+Sample Success Response:
+{
+  "statusCode": 200,
+  "success": true,
+  "message": "Jobs fetched successfully",
+  "data": [
+    {
+      "_id": "6ae5587b45c428cac7e80f79",
+      "title": "Fix Leaking Kitchen Sink",
+      "description": "The kitchen sink has been leaking for a week...",
+      "location": "Banani, Dhaka",
+      "budget": 150,
+      "preferredDate": "2026-11-15T10:00:00.000Z",
+      "status": "OPEN",
+      "category": { "_id": "6ae165f30bd4d47acdc57fcb", "name": "Plumbing & Sanitary" },
+      "service": { "_id": "6ae165f30bd4d47acdc57fcd", "name": "Sink Repair & Installation" },
+      "customer": {
+        "_id": "6ae0127051de26fed9d1c728",
+        "name": "Farhana Ahmed",
+        "image": "/images/customer-farhana.png"
+      },
+      "images": ["/images/sink-leak-1-1793415291689.png"],
+      "createdAt": "2026-10-31T02:54:51.749Z"
+    }
+  ],
+  "pagination": { "page": 1, "limit": 10, "total": 1, "totalPage": 1 }
+}
+
+----------------------------------------------------------------------------------------------------
+PAGE 4.2: Job Details & Proposal Submission Modal ("/pro/jobs/:id")
+----------------------------------------------------------------------------------------------------
+Purpose: Artisan reviews job full details, photos, location, and clicks "Send Proposal".
+Action: Submit Quotation
+Method: POST
+Endpoint: /api/v1/quotations
+Access: Artisan (Verified only)
+Content-Type: application/json
+
+Request Body:
+{
+  "job": "6ae5587b45c428cac7e80f79",
+  "proposedAmount": 140,
+  "rateType": "FIXED",
+  "message": "Hello! I am a certified plumber with 6 years experience. I can come tomorrow at 10 AM with pipe replacements.",
+  "estimatedDuration": "2 hours"
+}
+
+Sample Success Response (201 Created):
+{
+  "statusCode": 201,
+  "success": true,
+  "message": "Quotation submitted successfully",
+  "data": {
+    "_id": "6ae580124ed4c1e730b88f12",
+    "job": {
+      "_id": "6ae5587b45c428cac7e80f79",
+      "title": "Fix Leaking Kitchen Sink",
+      "location": "Banani, Dhaka",
+      "budget": 150,
+      "status": "OPEN"
+    },
+    "artisan": {
+      "_id": "6ae0396a5c15c7724e5cab1d",
+      "name": "Rahim Plumbing Solutions",
+      "phone": "+8801712345678"
+    },
+    "customer": "6ae0127051de26fed9d1c728",
+    "proposedAmount": 140,
+    "rateType": "FIXED",
+    "message": "Hello! I am a certified plumber with 6 years experience...",
+    "estimatedDuration": "2 hours",
+    "status": "PENDING",
+    "createdAt": "2026-10-31T04:15:00.000Z"
+  }
+}
+
+Error Cases to handle on frontend:
+  - 403 Forbidden: "Your artisan account is not active or your identity is not verified" -> Prompt to complete ID verification at `/pro/profile`.
+  - 400 Bad Request: "You already have a pending quotation for this job. You can edit it instead." -> Open edit modal.
+  - 400 Bad Request: "You cannot submit a quotation for your own job."
+
+----------------------------------------------------------------------------------------------------
+PAGE 4.3: Artisan's Submitted Quotations / Proposals List ("/pro/quotations" or "/pro/my-proposals")
+----------------------------------------------------------------------------------------------------
+Purpose: Artisan tracks all submitted proposals, their statuses (PENDING, ACCEPTED, REJECTED, WITHDRAWN).
+Method: GET
+Endpoint: /api/v1/quotations/my-quotations?page=1&limit=10&status=PENDING
+Access: Artisan
+
+Sample Success Response:
+{
+  "statusCode": 200,
+  "success": true,
+  "message": "Quotations fetched successfully",
+  "data": [
+    {
+      "_id": "6ae580124ed4c1e730b88f12",
+      "job": {
+        "_id": "6ae5587b45c428cac7e80f79",
+        "title": "Fix Leaking Kitchen Sink",
+        "location": "Banani, Dhaka",
+        "budget": 150,
+        "status": "OPEN",
+        "preferredDate": "2026-11-15T10:00:00.000Z"
+      },
+      "customer": {
+        "_id": "6ae0127051de26fed9d1c728",
+        "name": "Farhana Ahmed",
+        "image": "/images/customer-farhana.png"
+      },
+      "proposedAmount": 140,
+      "rateType": "FIXED",
+      "estimatedDuration": "2 hours",
+      "message": "Hello! I am a certified plumber with 6 years experience...",
+      "status": "PENDING",
+      "createdAt": "2026-10-31T04:15:00.000Z"
+    }
+  ],
+  "pagination": { "page": 1, "limit": 10, "total": 1, "totalPage": 1 }
+}
+
+Action: Edit Pending Quotation
+Method: PATCH
+Endpoint: /api/v1/quotations/:id
+Access: Artisan (Owner of quote)
+Body (Only send modified fields):
+{
+  "proposedAmount": 130,
+  "message": "Updated price after checking parts discount."
+}
+
+Action: Withdraw Quotation
+Method: PATCH
+Endpoint: /api/v1/quotations/:id/withdraw
+Access: Artisan (Owner of quote)
+Body: None {}
+Sample Response: Returns quotation with `status: 'WITHDRAWN'`.
+
+----------------------------------------------------------------------------------------------------
+PAGE 4.4: Artisan Bookings & Active Contracts ("/pro/bookings" or "/pro/schedule")
+----------------------------------------------------------------------------------------------------
+Purpose: Artisan views accepted work orders with customer phone, address, and agreed fee.
+Method: GET
+Endpoint: /api/v1/bookings/my-bookings?page=1&limit=10
+Access: Artisan
+
+Sample Success Response:
+{
+  "statusCode": 200,
+  "success": true,
+  "message": "Bookings fetched successfully",
+  "data": [
+    {
+      "_id": "6ae591144ed4c1e730b88f99",
+      "bookingNumber": "BK-428812-7814",
+      "job": {
+        "_id": "6ae5587b45c428cac7e80f79",
+        "title": "Fix Leaking Kitchen Sink",
+        "location": "House 14, Road 7, Banani, Dhaka",
+        "preferredDate": "2026-11-15T10:00:00.000Z"
+      },
+      "customer": {
+        "_id": "6ae0127051de26fed9d1c728",
+        "name": "Farhana Ahmed",
+        "phone": "+8801911223344",
+        "email": "farhana@gmail.com",
+        "image": "/images/customer-farhana.png"
+      },
+      "totalAmount": 140,
+      "rateType": "FIXED",
+      "status": "CONFIRMED",
+      "paymentStatus": "UNPAID",
+      "createdAt": "2026-10-31T05:00:00.000Z"
+    }
+  ]
+}
+
+
+====================================================================================================
+5. ADMIN DASHBOARD PAGES & APIS
+====================================================================================================
+
+----------------------------------------------------------------------------------------------------
+PAGE 5.1: All Jobs Oversight ("/admin/jobs")
+----------------------------------------------------------------------------------------------------
+Endpoint: GET /api/v1/job?page=1&limit=15&status=OPEN
+Access: Super Admin / Admin
+Capabilities:
+  - Admins can view jobs in ALL statuses: OPEN, BOOKED, IN_PROGRESS, COMPLETED, CANCELLED.
+  - Filter by category, service, status, or date range.
+
+----------------------------------------------------------------------------------------------------
+PAGE 5.2: Quotations Inspection ("/admin/quotations" or inside Job Drawer)
+----------------------------------------------------------------------------------------------------
+Endpoint: GET /api/v1/quotations/job/:jobId
+Access: Super Admin / Admin
+Capabilities:
+  - Admins can inspect all bids submitted across any job.
+  - View both accepted and rejected quotations to audit platform price ranges.
+
+----------------------------------------------------------------------------------------------------
+PAGE 5.3: Bookings & Revenue Management ("/admin/bookings")
+----------------------------------------------------------------------------------------------------
+Endpoint: GET /api/v1/bookings/:id
+Access: Super Admin / Admin
+Capabilities:
+  - View confirmed contracts between customer and artisan, payment status (UNPAID/PAID), and dispute data.
+
+
+====================================================================================================
+6. REAL-TIME NOTIFICATIONS & WEBSOCKET GUIDE
+====================================================================================================
+
+The backend emits Socket.io events and dispatches Kafka background events on every stage of the flow:
+
+1. When a new Job is created:
+   - Kafka event: `JOB_CREATED` -> Dispatches batch notifications to matching active artisans.
+   - Socket event: `getNotification::<artisanUserId>`
+   - Payload:
+     {
+       "title": "New job available",
+       "message": "A new job \"Fix Leaking Kitchen Sink\" matches your service.",
+       "path": "/jobs/6ae5587b45c428cac7e80f79",
+       "seen": false
+     }
+
+2. When Artisan submits a Quotation:
+   - Socket event: `getNotification::<customerUserId>`
+   - Payload:
+     {
+       "title": "New Quotation Received",
+       "message": "Rahim Plumbing Solutions submitted an offer of $140 (FIXED) for \"Fix Leaking Kitchen Sink\".",
+       "path": "/jobs/6ae5587b45c428cac7e80f79"
+     }
+   - Automated HTML Email sent to Customer with "Review Proposal" button.
+
+3. When Customer Accepts Quotation:
+   - Socket event to Selected Artisan: `getNotification::<acceptedArtisanId>`
+     Title: "Quotation Accepted! 🎉"
+     Message: "Great news! Your quotation for \"Fix Leaking Kitchen Sink\" has been accepted. Booking #BK-428812-7814 is confirmed."
+     Path: "/bookings/6ae591144ed4c1e730b88f99"
+   - Socket event to Rejected Artisans: `getNotification::<otherArtisanId>`
+     Title: "Quotation Update"
+     Message: "The customer has selected another proposal for \"Fix Leaking Kitchen Sink\"."
+   - Automated HTML Confirmation Emails sent to both Customer and Artisan.
+
+Notification API Endpoints for Frontend:
+  - GET /api/v1/notification (Fetch unread/all notifications with pagination)
+  - PATCH /api/v1/notification/:id (Mark single notification as seen)
+  - PATCH /api/v1/notification/read-all (Mark all as seen)
+  - DELETE /api/v1/notification (Clear all notifications)
+
+
+====================================================================================================
+7. RECOMMENDED REDUX RTK-QUERY SERVICE SLICE (FRONTEND BOILERPLATE)
+====================================================================================================
+
+```typescript
+// quotationApi.ts
+import { baseApi } from '@/redux/api/baseApi';
+
+export const quotationApi = baseApi.injectEndpoints({
+  endpoints: (builder) => ({
+    // Artisan: Submit Quotation
+    submitQuotation: builder.mutation({
+      query: (body) => ({
+        url: '/quotations',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Quotations', 'Jobs'],
+    }),
+
+    // Artisan: Get My Submitted Proposals
+    getMyQuotations: builder.query({
+      query: (params) => ({
+        url: '/quotations/my-quotations',
+        method: 'GET',
+        params,
+      }),
+      providesTags: ['Quotations'],
+    }),
+
+    // Customer: Get Proposals for a Job
+    getJobQuotations: builder.query({
+      query: (jobId) => ({
+        url: `/quotations/job/${jobId}`,
+        method: 'GET',
+      }),
+      providesTags: (result, error, jobId) => [{ type: 'JobQuotations', id: jobId }],
+    }),
+
+    // Customer: Accept Proposal
+    acceptQuotation: builder.mutation({
+      query: (quotationId) => ({
+        url: `/quotations/${quotationId}/accept`,
+        method: 'PATCH',
+      }),
+      invalidatesTags: ['JobQuotations', 'Quotations', 'Jobs', 'Bookings'],
+    }),
+
+    // Customer: Reject Proposal
+    rejectQuotation: builder.mutation({
+      query: ({ quotationId, rejectReason }) => ({
+        url: `/quotations/${quotationId}/reject`,
+        method: 'PATCH',
+        body: { rejectReason },
+      }),
+      invalidatesTags: ['JobQuotations', 'Quotations'],
+    }),
+
+    // Artisan: Edit Proposal
+    updateQuotation: builder.mutation({
+      query: ({ id, ...body }) => ({
+        url: `/quotations/${id}`,
+        method: 'PATCH',
+        body,
+      }),
+      invalidatesTags: ['Quotations', 'JobQuotations'],
+    }),
+
+    // Artisan: Withdraw Proposal
+    withdrawQuotation: builder.mutation({
+      query: (id) => ({
+        url: `/quotations/${id}/withdraw`,
+        method: 'PATCH',
+      }),
+      invalidatesTags: ['Quotations', 'JobQuotations'],
+    }),
+
+    // Get My Bookings (Customer or Artisan)
+    getMyBookings: builder.query({
+      query: (params) => ({
+        url: '/bookings/my-bookings',
+        method: 'GET',
+        params,
+      }),
+      providesTags: ['Bookings'],
+    }),
+  }),
+});
+
+export const {
+  useSubmitQuotationMutation,
+  useGetMyQuotationsQuery,
+  useGetJobQuotationsQuery,
+  useAcceptQuotationMutation,
+  useRejectQuotationMutation,
+  useUpdateQuotationMutation,
+  useWithdrawQuotationMutation,
+  useGetMyBookingsQuery,
+} = quotationApi;
+```
+
+====================================================================================================
+End of Guide. Everything is tested and verified on nutsumo-backend (TypeScript 0 errors).
+====================================================================================================

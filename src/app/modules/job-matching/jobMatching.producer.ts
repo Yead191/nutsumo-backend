@@ -2,8 +2,8 @@ import { Producer } from 'kafkajs';
 import kafka from '../../../config/kafka';
 import { logger, errorLogger } from '../../../shared/logger';
 import { IJobMatchingJobData } from './jobmatching.interface';
-import { JOB_EVENT_TYPES, KAFKA_TOPICS } from './jobmatching.constants';
-import { JobMatchingServices } from './jobmatching.service';
+import { JOB_EVENT_TYPES, KAFKA_TOPICS } from './jobMatching.constants';
+import { JobMatchingServices } from './jobMatching.service';
 let producer: Producer | null = null;
 let isConnecting = false;
 

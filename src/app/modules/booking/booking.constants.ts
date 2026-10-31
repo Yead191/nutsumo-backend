@@ -1,0 +1,14 @@
+export const BOOKING_STATUSES = {
+  CONFIRMED: 'CONFIRMED',
+  IN_PROGRESS: 'IN_PROGRESS',
+  COMPLETED: 'COMPLETED',
+  CANCELLED: 'CANCELLED',
+} as const;
+
+export const BOOKING_PAYMENT_STATUSES = {
+  UNPAID: 'UNPAID',
+  PAID: 'PAID',
+  REFUNDED: 'REFUNDED',
+} as const;
+
+export const BOOKING_SEARCHABLE_FIELDS = ['bookingNumber', 'notes'];
