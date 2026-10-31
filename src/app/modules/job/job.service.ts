@@ -134,7 +134,7 @@ const getMyJobs = async (customerId: string, query: Record<string, any>) => {
 // GET ALL PUBLIC JOBS
 const getAllJobs = async (user: JwtPayload, query: Record<string, any>) => {
   const initQuery = [USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN].includes(
-    user.role,
+    user?.role,
   )
     ? {}
     : {

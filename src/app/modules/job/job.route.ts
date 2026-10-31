@@ -41,11 +41,7 @@ router
     validateRequest(JobValidations.createJobValidationSchema),
     JobController.createJob,
   )
-  .get(
-    tempAuth(),
-    validateRequest(JobValidations.getJobsValidationSchema),
-    JobController.getAllJobs,
-  );
+  .get(tempAuth(), JobController.getAllJobs);
 
 router.route('/my-jobs').get(auth(USER_ROLES.USER), JobController.getMyJobs);
 

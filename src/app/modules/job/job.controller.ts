@@ -42,7 +42,7 @@ const getMyJobs = catchAsync(async (req: Request, res: Response) => {
 
 // Get all jobs (supports search, category, status, pagination)
 const getAllJobs = catchAsync(async (req: Request, res: Response) => {
-  const data = await JobServices.getAllJobs(req.user!, req.query);
+  const data = await JobServices.getAllJobs(req.user, req.query);
 
   return sendResponse(res, {
     statusCode: StatusCodes.OK,
