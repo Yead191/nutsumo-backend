@@ -1,58 +1,72 @@
 import { Consumer } from 'kafkajs';
 import kafka from '../../../config/kafka';
 import { logger, errorLogger } from '../../../shared/logger';
-import {
-  KAFKA_GROUP_IDS,
-  KAFKA_TOPICS,
-  JOB_EVENT_TYPES,
-} from './jobMatching.constants';
-import { JobMatchingServices } from './jobMatching.service';
+
 import { IJobMatchingJobData } from './jobmatching.interface';
+import { kafkaConsumer } from '../../../tools/kafka/kafka-producers/kafka.consumer';
+import { JobMatchingServices } from './jobmatching.service';
 
 let consumer: Consumer | null = null;
 
 /**
  * Initializes the Kafka consumer for Job Matching & Notifications.
  */
+// export const initJobMatchingConsumer = async (): Promise<void> => {
+//   try {
+//     consumer = kafka.consumer({ groupId: KAFKA_GROUP_IDS.JOB_MATCHING });
+//     await consumer.connect();
+//     await consumer.subscribe({
+//       topic: KAFKA_TOPICS.JOB_EVENTS,
+//       fromBeginning: false,
+//     });
+
+//     logger.info(
+//       `[Kafka Consumer] Subscribed to topic "${KAFKA_TOPICS.JOB_EVENTS}" with group "${KAFKA_GROUP_IDS.JOB_MATCHING}"`,
+//     );
+
+//     await consumer.run({
+//       eachMessage: async ({ topic, partition, message }) => {
+//         try {
+//           if (!message.value) return;
+
+//           const parsed = JSON.parse(message.value.toString());
+//           logger.info(
+//             `[Kafka Consumer] Received "${parsed.event}" event on topic ${topic} (partition: ${partition})`,
+//           );
+
+//           if (parsed.event === JOB_EVENT_TYPES.JOB_CREATED) {
+//             const payload: IJobMatchingJobData = parsed.data;
+//             await JobMatchingServices.executeJobMatchingAndNotification(payload);
+//           }
+//         } catch (msgErr: any) {
+//           errorLogger.error(
+//             `[Kafka Consumer] Error processing message on topic ${topic}: ${msgErr.message}`,
+//             msgErr,
+//           );
+//         }
+//       },
+//     });
+//   } catch (error: any) {
+//     logger.warn(
+//       `[Kafka Consumer] Could not connect to Kafka broker (${error?.message || error}). Will proceed without active Kafka consumer.`,
+//     );
+//   }
+// };
+
 export const initJobMatchingConsumer = async (): Promise<void> => {
   try {
-    consumer = kafka.consumer({ groupId: KAFKA_GROUP_IDS.JOB_MATCHING });
-    await consumer.connect();
-    await consumer.subscribe({
-      topic: KAFKA_TOPICS.JOB_EVENTS,
-      fromBeginning: false,
-    });
-
-    logger.info(
-      `[Kafka Consumer] Subscribed to topic "${KAFKA_TOPICS.JOB_EVENTS}" with group "${KAFKA_GROUP_IDS.JOB_MATCHING}"`,
-    );
-
-    await consumer.run({
-      eachMessage: async ({ topic, partition, message }) => {
-        try {
-          if (!message.value) return;
-
-          const parsed = JSON.parse(message.value.toString());
-          logger.info(
-            `[Kafka Consumer] Received "${parsed.event}" event on topic ${topic} (partition: ${partition})`,
-          );
-
-          if (parsed.event === JOB_EVENT_TYPES.JOB_CREATED) {
-            const payload: IJobMatchingJobData = parsed.data;
-            await JobMatchingServices.executeJobMatchingAndNotification(payload);
-          }
-        } catch (msgErr: any) {
-          errorLogger.error(
-            `[Kafka Consumer] Error processing message on topic ${topic}: ${msgErr.message}`,
-            msgErr,
-          );
+    await kafkaConsumer({
+      topic: 'notification',
+      groupId: 'nutsumo-notification',
+      cb: async ({ type, data }: { type: string; data: any }) => {
+        switch (type) {
+          case 'JOB_CREATED':
+            await JobMatchingServices.executeJobMatchingAndNotification(data);
+            break;
         }
       },
     });
-  } catch (error: any) {
-    logger.warn(
-      `[Kafka Consumer] Could not connect to Kafka broker (${error?.message || error}). Will proceed without active Kafka consumer.`,
-    );
+  } catch (error) {
+    console.error(error);
   }
 };
-

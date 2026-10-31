@@ -15,7 +15,7 @@ import QueryBuilder from '../../builder/QueryBuilder';
 import unlinkFile from '../../../shared/unlinkFile';
 import { JwtPayload } from 'jsonwebtoken';
 import { USER_ROLES } from '../../../enums/user';
-import { publishJobCreatedEvent } from '../job-matching/jobMatching.producer';
+import { kafkaProducer } from '../../../tools/kafka/kafka-producers/kafka.producer';
 
 interface IJobFilters {
   status?: JobStatus;
@@ -72,14 +72,15 @@ const createJob = async (customerId: string, payload: Partial<IJob>) => {
 
     const job = await Job.create(jobData);
 
-    // Asynchronously publish job created event to Kafka (Non-blocking)
-    await publishJobCreatedEvent({
-      jobId: String(job._id),
-      jobTitle: job.title,
+    await kafkaProducer.sendMessage('notification', {
+      type: 'JOB_CREATED',
+      data: {
+        jobId: String(job._id),
+        jobTitle: job.title,
+      },
     });
 
     return job;
-
   } catch (error) {
     if (payload.images && payload.images.length > 0) {
       for (const img of payload.images) {
@@ -137,8 +138,8 @@ const getAllJobs = async (user: JwtPayload, query: Record<string, any>) => {
   )
     ? {}
     : {
-      status: JOB_STATUSES.OPEN,
-    };
+        status: JOB_STATUSES.OPEN,
+      };
 
   const qb = new QueryBuilder(
     Job.find(initQuery).populate([

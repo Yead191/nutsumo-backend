@@ -4,7 +4,7 @@ import config from '.';
 const kafka = new Kafka({
   clientId: 'my-app',
   brokers: [config.kafka.url!],
-  logLevel: 2,
+  logLevel: 0,
 });
 
 export default kafka;

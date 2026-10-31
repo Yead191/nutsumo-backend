@@ -1,10 +1,9 @@
 import { Producer } from 'kafkajs';
 import kafka from '../../../config/kafka';
 import { logger, errorLogger } from '../../../shared/logger';
-import { KAFKA_TOPICS, JOB_EVENT_TYPES } from './jobMatching.constants';
 import { IJobMatchingJobData } from './jobmatching.interface';
-import { JobMatchingServices } from './jobMatching.service';
-
+import { JOB_EVENT_TYPES, KAFKA_TOPICS } from './jobmatching.constants';
+import { JobMatchingServices } from './jobmatching.service';
 let producer: Producer | null = null;
 let isConnecting = false;
 
@@ -35,7 +34,7 @@ const getKafkaProducer = async (): Promise<Producer> => {
 
 /**
  * Publish a JOB_CREATED event to Kafka topic.
- * 
+ *
  * Resilient Architecture:
  * - In Production with Kafka running: Dispatches event to distributed Kafka topic.
  * - In Development (or if Kafka broker is temporarily offline): Seamlessly falls back
@@ -80,4 +79,3 @@ export const publishJobCreatedEvent = async (
     });
   }
 };
-
