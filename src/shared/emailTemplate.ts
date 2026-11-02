@@ -29,6 +29,15 @@ import {
   quotationRejectedArtisanEmail,
 } from '../templates/quotationTemplate';
 
+import {
+  bookingEscrowPaymentCustomerEmail,
+  bookingEscrowPaymentArtisanEmail,
+  bookingDeliveredCustomerEmail,
+  bookingCompletionConfirmedArtisanEmail,
+  bookingPayoutApprovedArtisanEmail,
+  bookingPayoutReleasedArtisanEmail,
+} from '../templates/bookingTemplate';
+
 export const emailTemplate = {
   createAccount,
   resetPassword,
@@ -50,5 +59,11 @@ export const emailTemplate = {
   quotationAcceptedArtisanEmail,
   bookingConfirmedCustomerEmail,
   quotationRejectedArtisanEmail,
-};
 
+  bookingEscrowPaymentCustomerEmail,
+  bookingEscrowPaymentArtisanEmail,
+  bookingDeliveredCustomerEmail,
+  bookingCompletionConfirmedArtisanEmail,
+  bookingPayoutApprovedArtisanEmail,
+  bookingPayoutReleasedArtisanEmail,
+};

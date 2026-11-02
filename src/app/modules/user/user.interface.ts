@@ -40,6 +40,14 @@ export interface IUser {
   experienceYears?: number;
   availabilityStatus?: 'Available' | 'Booked' | 'Unavailable';
 
+  stripeAccountInfo?: {
+    accountId?: string;
+    loginUrl?: string;
+    charges_enabled?: boolean;
+    payouts_enabled?: boolean;
+    details_submitted?: boolean;
+  };
+
   authentication?: {
     isResetPassword: boolean;
     oneTimeCode: number;

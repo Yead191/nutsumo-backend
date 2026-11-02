@@ -3,6 +3,7 @@ import stripe from '../config/stripe';
 import config from '../config';
 import Stripe from 'stripe';
 import { handleMembershipCheckout } from '../handlers/handleMembershipCheckout';
+import { handleBookingPayment } from '../handlers/handleBookingPayment';
 import { handleInvoicePaymentSucceeded } from '../handlers/handleInvoicePaymentSucceeded';
 import { handleInvoicePaymentFailed } from '../handlers/handleInvoicePaymentFailed';
 import handleSubscriptionDelete from '../handlers/handleSubscriptionDelete';
@@ -32,6 +33,11 @@ export const handleStripeWebhook = async (req: Request, res: Response) => {
         const session = event.data.object as Stripe.Checkout.Session;
         if (session.metadata?.membershipId) {
           await handleMembershipCheckout(session);
+        } else if (
+          session.metadata?.type === 'BOOKING_ESCROW_PAYMENT' ||
+          session.metadata?.bookingId
+        ) {
+          await handleBookingPayment(session);
         }
         break;
 

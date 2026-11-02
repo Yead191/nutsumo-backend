@@ -10,7 +10,7 @@
     "prettier:check": "prettier --ignore-path .gitignore --write \"**/*.+(js|ts|json)\"",
     "prettier:fix": "prettier --write .",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "stripe": "stripe listen --forward-to http://10.10.26.173:5004/api/stripe/webhook",
+    "stripe": "stripe listen --forward-to http://10.10.26.173:5005/api/stripe/webhook",
     "docker-app": "docker-compose -f docker-compose.app.yaml up --build",
     "docker-infra": "docker-compose -f docker-compose.infra.yaml up --build -d",
     "create-module": "ts-node ./src/gm.ts",

@@ -373,3 +373,70 @@ export type IQuotationRejectedEmail = {
   jobTitle: string;
   reason?: string;
 };
+
+export type IBookingEscrowPaymentCustomerEmail = {
+  customerName: string;
+  customerEmail: string;
+  artisanName: string;
+  jobTitle: string;
+  bookingNumber: string;
+  bookingId: string;
+  amount: number;
+  transactionId?: string;
+};
+
+export type IBookingEscrowPaymentArtisanEmail = {
+  artisanName: string;
+  artisanEmail: string;
+  customerName: string;
+  jobTitle: string;
+  bookingNumber: string;
+  bookingId: string;
+  totalAmount: number;
+  artisanPayoutAmount: number;
+};
+
+export type IBookingDeliveredCustomerEmail = {
+  customerName: string;
+  customerEmail: string;
+  artisanName: string;
+  jobTitle: string;
+  bookingNumber: string;
+  bookingId: string;
+  deliveryNotes?: string;
+};
+
+export type IBookingCompletionConfirmedArtisanEmail = {
+  artisanName: string;
+  artisanEmail: string;
+  customerName: string;
+  jobTitle: string;
+  bookingNumber: string;
+  bookingId: string;
+  netPayoutAmount: number;
+  rating?: number;
+  feedback?: string;
+};
+
+export type IBookingPayoutApprovedArtisanEmail = {
+  artisanName: string;
+  artisanEmail: string;
+  jobTitle: string;
+  bookingNumber: string;
+  bookingId: string;
+  netPayoutAmount: number;
+};
+
+export type IBookingPayoutReleasedArtisanEmail = {
+  artisanName: string;
+  artisanEmail: string;
+  jobTitle: string;
+  bookingNumber: string;
+  bookingId: string;
+  totalAmount: number;
+  platformFee: number;
+  netPayoutAmount: number;
+  payoutMethod?: string;
+  payoutTransferId?: string;
+};
+

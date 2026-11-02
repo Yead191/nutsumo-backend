@@ -1,14 +1,30 @@
 export const BOOKING_STATUSES = {
+  AWAITING_PAYMENT: 'AWAITING_PAYMENT',
   CONFIRMED: 'CONFIRMED',
   IN_PROGRESS: 'IN_PROGRESS',
+  DELIVERED: 'DELIVERED',
   COMPLETED: 'COMPLETED',
   CANCELLED: 'CANCELLED',
 } as const;
 
 export const BOOKING_PAYMENT_STATUSES = {
   UNPAID: 'UNPAID',
+  ESCROW_HELD: 'ESCROW_HELD',
   PAID: 'PAID',
   REFUNDED: 'REFUNDED',
 } as const;
 
-export const BOOKING_SEARCHABLE_FIELDS = ['bookingNumber', 'notes'];
+export const BOOKING_PAYOUT_STATUSES = {
+  PENDING: 'PENDING',
+  APPROVED: 'APPROVED',
+  RELEASED: 'RELEASED',
+  REJECTED: 'REJECTED',
+} as const;
+
+export const DEFAULT_PLATFORM_COMMISSION_PERCENTAGE = 10;
+
+export const BOOKING_SEARCHABLE_FIELDS = [
+  'bookingNumber',
+  'notes',
+  'deliveryNotes',
+];

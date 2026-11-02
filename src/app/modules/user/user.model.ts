@@ -112,6 +112,14 @@ const userSchema = new Schema<IUser, UserModal>(
       ref: 'ArtisanProfile',
     },
 
+    stripeAccountInfo: {
+      accountId: { type: String, default: null },
+      loginUrl: { type: String, default: null },
+      charges_enabled: { type: Boolean, default: false },
+      payouts_enabled: { type: Boolean, default: false },
+      details_submitted: { type: Boolean, default: false },
+    },
+
     authentication: {
       type: {
         isResetPassword: {

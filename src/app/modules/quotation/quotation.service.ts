@@ -7,6 +7,11 @@ import { QUOTATION_STATUSES } from './quotation.constants';
 import { Job } from '../job/job.model';
 import { JOB_STATUSES } from '../job/job.constants';
 import { Booking } from '../booking/booking.model';
+import {
+  BOOKING_STATUSES,
+  BOOKING_PAYMENT_STATUSES,
+  DEFAULT_PLATFORM_COMMISSION_PERCENTAGE,
+} from '../booking/booking.constants';
 import { User } from '../user/user.model';
 import { USER_ROLES } from '../../../enums/user';
 import QueryBuilder from '../../builder/QueryBuilder';
@@ -15,6 +20,8 @@ import { emailHelper } from '../../../helpers/emailHelper';
 import { emailTemplate } from '../../../shared/emailTemplate';
 import { kafkaProducer } from '../../../tools/kafka/kafka-producers/kafka.producer';
 import { logger } from '../../../shared/logger';
+import stripe from '../../../config/stripe';
+import config from '../../../config';
 
 // Helper to generate human-readable unique booking number
 const generateBookingNumber = () => {
@@ -169,7 +176,7 @@ const submitQuotation = async (
     title: 'New Quotation Received',
     message: `${artisan.name} submitted an offer of $${payload.proposedAmount} (${payload.rateType}) for "${job.title}".`,
     refId: quotationDoc._id as Types.ObjectId,
-    path: `/jobs/${job._id}`,
+    path: `/account/jobs/${job._id}`,
     seen: false,
   });
 
@@ -545,9 +552,17 @@ const acceptQuotation = async (quotationId: string, customerId: string) => {
       }
     }
 
-    // 6. Create Booking record
+    // 6. Create Booking record with Platform Commission & Artisan Payout
     const bookingNumber = generateBookingNumber();
-    let bookingDoc;
+    const platformCommissionRate = DEFAULT_PLATFORM_COMMISSION_PERCENTAGE;
+    const platformFee = Number(
+      ((quotation.proposedAmount * platformCommissionRate) / 100).toFixed(2),
+    );
+    const artisanPayoutAmount = Number(
+      (quotation.proposedAmount - platformFee).toFixed(2),
+    );
+
+    let bookingDoc: any;
 
     const bookingPayload = {
       bookingNumber,
@@ -557,8 +572,11 @@ const acceptQuotation = async (quotationId: string, customerId: string) => {
       artisan: quotation.artisan,
       totalAmount: quotation.proposedAmount,
       rateType: quotation.rateType,
-      status: 'CONFIRMED' as const,
-      paymentStatus: 'UNPAID' as const,
+      platformCommissionRate,
+      platformFee,
+      artisanPayoutAmount,
+      status: BOOKING_STATUSES.AWAITING_PAYMENT,
+      paymentStatus: BOOKING_PAYMENT_STATUSES.UNPAID,
     };
 
     if (session) {
@@ -574,7 +592,59 @@ const acceptQuotation = async (quotationId: string, customerId: string) => {
       session.endSession();
     }
 
-    // 7. Post-Transaction Notifications & Kafka Dispatch
+    // 7. Generate Stripe Checkout Session for Immediate Escrow Payment
+    let checkoutUrl: string | null = null;
+    try {
+      const [customerUser, artisanUser] = await Promise.all([
+        User.findById(customerId).select('name email phone'),
+        User.findById(quotation.artisan).select('name email phone'),
+      ]);
+
+      const line_items = [
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: `Booking #${bookingNumber} - ${job.title}`,
+              description: `Escrow payment for ${artisanUser?.name || 'Artisan'}'s service on "${job.title}"`,
+            },
+            unit_amount: Math.round(quotation.proposedAmount * 100),
+          },
+          quantity: 1,
+        },
+      ];
+
+      const stripeSession = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items,
+        mode: 'payment',
+        success_url: `${config.frontend_url}/payment/success?bookingId=${bookingDoc._id}&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${config.frontend_url}/payment/cancel?bookingId=${bookingDoc._id}`,
+        customer_email: customerUser?.email,
+        metadata: {
+          type: 'BOOKING_ESCROW_PAYMENT',
+          bookingId: bookingDoc._id.toString(),
+          jobId: job._id.toString(),
+          customerId: customerId.toString(),
+          artisanId: quotation.artisan.toString(),
+          bookingNumber,
+        },
+      });
+
+      if (stripeSession?.url) {
+        checkoutUrl = stripeSession.url;
+        await Booking.findByIdAndUpdate(bookingDoc._id, {
+          stripeSessionId: stripeSession.id,
+        });
+        bookingDoc.stripeSessionId = stripeSession.id;
+      }
+    } catch (stripeErr: any) {
+      logger.warn(
+        `[Stripe] Could not create immediate checkout session: ${stripeErr?.message}`,
+      );
+    }
+
+    // 8. Post-Transaction Notifications & Kafka Dispatch
     try {
       await kafkaProducer.sendMessage('notification', {
         type: 'QUOTATION_ACCEPTED',
@@ -588,6 +658,7 @@ const acceptQuotation = async (quotationId: string, customerId: string) => {
           artisanId: String(quotation.artisan),
           amount: quotation.proposedAmount,
           rateType: quotation.rateType,
+          checkoutUrl,
         },
       });
     } catch (err: any) {
@@ -600,19 +671,19 @@ const acceptQuotation = async (quotationId: string, customerId: string) => {
     await NotificationServices.createNotification({
       receiver: quotation.artisan,
       title: 'Quotation Accepted! 🎉',
-      message: `Great news! Your quotation for "${job.title}" has been accepted. Booking #${bookingNumber} is confirmed.`,
+      message: `Great news! Your quotation for "${job.title}" has been accepted. Booking #${bookingNumber} is created (awaiting customer escrow payment).`,
       refId: bookingDoc._id as Types.ObjectId,
-      path: `/bookings/${bookingDoc._id}`,
+      path: `/artisan/bookings/${bookingDoc._id}`,
       seen: false,
     });
 
     // Notify Customer
     await NotificationServices.createNotification({
       receiver: new Types.ObjectId(customerId),
-      title: 'Booking Confirmed',
-      message: `You have successfully booked "${job.title}". Booking #${bookingNumber} created.`,
+      title: 'Booking Created - Awaiting Payment',
+      message: `You accepted ${job.title}'s quotation. Please complete payment to fund the escrow deposit and confirm Booking #${bookingNumber}.`,
       refId: bookingDoc._id as Types.ObjectId,
-      path: `/bookings/${bookingDoc._id}`,
+      path: `/account/bookings/${bookingDoc._id}`,
       seen: false,
     });
 
@@ -668,6 +739,7 @@ const acceptQuotation = async (quotationId: string, customerId: string) => {
       quotation,
       booking: bookingDoc,
       job,
+      checkoutUrl,
     };
   } catch (error) {
     if (useTransaction && session) {
