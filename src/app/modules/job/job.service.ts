@@ -1,3 +1,4 @@
+import { Quotation } from '../quotation/quotation.model';
 import { FilterQuery, Types } from 'mongoose';
 import { StatusCodes } from 'http-status-codes';
 
@@ -191,10 +192,30 @@ const getSingleJob = async (
   }
 
   const isOwner =
-    requesterId && job.customer._id.toString() === requesterId.toString();
+    requesterId && job.customer?._id?.toString() === requesterId.toString();
+
+  const isSelectedArtisan =
+    requesterId &&
+    job.selectedArtisan &&
+    job.selectedArtisan.toString() === requesterId.toString();
+
+  let hasQuotation = false;
+  if (requesterId && !isOwner && !isSelectedArtisan) {
+    const quotationDoc = await Quotation.findOne({
+      job: jobId,
+      artisan: requesterId,
+    });
+    hasQuotation = !!quotationDoc;
+  }
 
   // Hide non-open jobs from unrelated public visitors.
-  if (job.status !== JOB_STATUSES.OPEN && !isOwner && !isAdmin) {
+  if (
+    job.status !== JOB_STATUSES.OPEN &&
+    !isOwner &&
+    !isSelectedArtisan &&
+    !hasQuotation &&
+    !isAdmin
+  ) {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Job not found');
   }
 

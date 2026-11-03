@@ -91,7 +91,9 @@ const createBookingCheckoutSession = async (
     metadata: {
       type: 'BOOKING_ESCROW_PAYMENT',
       bookingId: booking._id.toString(),
-      jobId: booking.job?._id ? booking.job._id.toString() : String(booking.job),
+      jobId: booking.job?._id
+        ? booking.job._id.toString()
+        : String(booking.job),
       customerId: customerId.toString(),
       artisanId: booking.artisan?._id
         ? booking.artisan._id.toString()
@@ -197,7 +199,7 @@ const startWork = async (bookingId: string, artisanId: string) => {
     title: 'Work Started 🔨',
     message: `Artisan has started work on Booking #${booking.bookingNumber}.`,
     refId: booking._id,
-    path: `/bookings/${booking._id}`,
+    path: `/account/bookings/${booking._id}`,
     seen: false,
   });
 
@@ -281,7 +283,7 @@ const deliverBooking = async (
     title: 'Work Delivered for Review 📦',
     message: `${artisan?.name || 'Artisan'} has marked Booking #${booking.bookingNumber} as delivered. Please review and confirm completion.`,
     refId: booking._id,
-    path: `/bookings/${booking._id}`,
+    path: `/account/bookings/${booking._id}`,
     seen: false,
   });
 
@@ -406,7 +408,7 @@ const confirmBookingCompletion = async (
     title: 'Customer Confirmed Completion! 🎉',
     message: `${customer?.name || 'Customer'} confirmed completion of Booking #${booking.bookingNumber}. Payout ($${Number(booking.artisanPayoutAmount).toFixed(2)}) is awaiting Admin approval.`,
     refId: booking._id,
-    path: `/artisan/bookings/${booking._id}`,
+    path: `/pro/jobs/${booking._id}`,
     seen: false,
   });
 

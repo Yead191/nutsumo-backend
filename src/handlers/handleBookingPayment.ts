@@ -27,7 +27,9 @@ export const handleBookingPayment = async (
   const bookingId = metadata?.bookingId;
 
   if (!bookingId || !Types.ObjectId.isValid(bookingId)) {
-    logger.warn('[BookingPayment] No valid bookingId found in session metadata');
+    logger.warn(
+      '[BookingPayment] No valid bookingId found in session metadata',
+    );
     return;
   }
 
@@ -193,7 +195,7 @@ export const handleBookingPayment = async (
       title: 'Payment Secured in Escrow 🛡️',
       message: `Your payment of $${Number(booking.totalAmount).toFixed(2)} for Booking #${booking.bookingNumber} is securely held in Escrow. The artisan has been notified to start work.`,
       refId: booking._id,
-      path: `/bookings/${booking._id}`,
+      path: `/account/bookings/${booking._id}`,
       seen: false,
     });
 
@@ -203,7 +205,7 @@ export const handleBookingPayment = async (
       title: 'Escrow Payment Secured! 💰',
       message: `The customer has funded Booking #${booking.bookingNumber} ($${Number(booking.totalAmount).toFixed(2)}). You can now begin work safely!`,
       refId: booking._id,
-      path: `/artisan/bookings/${booking._id}`,
+      path: `/pro/jobs/${booking._id}`,
       seen: false,
     });
 

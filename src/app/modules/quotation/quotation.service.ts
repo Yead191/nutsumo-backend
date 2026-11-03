@@ -673,7 +673,7 @@ const acceptQuotation = async (quotationId: string, customerId: string) => {
       title: 'Quotation Accepted! 🎉',
       message: `Great news! Your quotation for "${job.title}" has been accepted. Booking #${bookingNumber} is created (awaiting customer escrow payment).`,
       refId: bookingDoc._id as Types.ObjectId,
-      path: `/artisan/bookings/${bookingDoc._id}`,
+      path: `/pro/jobs/${bookingDoc._id}`,
       seen: false,
     });
 
