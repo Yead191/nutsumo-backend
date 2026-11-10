@@ -72,6 +72,13 @@ export interface IBooking {
   customerRating?: number;
   customerFeedback?: string;
 
+  // Cancellation details
+  cancelledAt?: Date | null;
+  cancelledBy?: Types.ObjectId | null;
+  cancellationReason?: string;
+  refundId?: string | null;
+  refundAmount?: number;
+
   // Payout Details
   payoutApprovedAt?: Date | null;
   payoutApprovedBy?: Types.ObjectId | null;
