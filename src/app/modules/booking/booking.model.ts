@@ -116,12 +116,41 @@ const bookingSchema = new Schema<IBooking, BookingModel>(
       type: [String],
       default: [],
     },
+    revisionNotes: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    revisionCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    disputeReason: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    disputedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    disputedAt: {
+      type: Date,
+      default: null,
+    },
     customerConfirmedAt: {
       type: Date,
       default: null,
     },
     completionDate: {
       type: Date,
+      default: null,
+    },
+    review: {
+      type: Schema.Types.ObjectId,
+      ref: 'Review',
       default: null,
     },
     customerRating: {

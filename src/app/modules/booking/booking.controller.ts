@@ -4,6 +4,7 @@ import catchAsync from '../../../shared/catchAsync';
 import sendResponse from '../../../shared/sendResponse';
 import { StatusCodes } from 'http-status-codes';
 import { USER_ROLES } from '../../../enums/user';
+import { getMultipleFilesPath } from '../../../shared/getFilePath';
 
 // 1. Create Checkout Session for Escrow Payment
 const createBookingCheckoutSession = catchAsync(
@@ -60,10 +61,23 @@ const deliverBooking = catchAsync(async (req: Request, res: Response) => {
   const bookingId = req.params.id;
   const artisanId = req.user?.id;
 
+  const files = req.files as any;
+  const uploadedProof =
+    getMultipleFilesPath(files, 'deliveryProof') ||
+    getMultipleFilesPath(files, 'images') ||
+    getMultipleFilesPath(files, 'image');
+
+  const payload = {
+    ...req.body,
+    deliveryProof: uploadedProof?.length
+      ? uploadedProof
+      : req.body.deliveryProof || req.body.workImages || [],
+  };
+
   const result = await BookingServices.deliverBooking(
     bookingId,
     artisanId,
-    req.body,
+    payload,
   );
 
   return sendResponse(res, {
@@ -74,7 +88,46 @@ const deliverBooking = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-// 5. Confirm Completion (Customer)
+// 5. Request Revision (Customer)
+const requestRevision = catchAsync(async (req: Request, res: Response) => {
+  const bookingId = req.params.id;
+  const customerId = req.user?.id;
+
+  const result = await BookingServices.requestRevision(
+    bookingId,
+    customerId,
+    req.body,
+  );
+
+  return sendResponse(res, {
+    statusCode: StatusCodes.OK,
+    success: true,
+    message: 'Revision requested successfully. Artisan has been notified.',
+    data: result,
+  });
+});
+
+// 6. Dispute Booking (Customer / Artisan)
+const disputeBooking = catchAsync(async (req: Request, res: Response) => {
+  const bookingId = req.params.id;
+  const userId = req.user?.id;
+
+  const result = await BookingServices.disputeBooking(
+    bookingId,
+    userId,
+    req.body,
+  );
+
+  return sendResponse(res, {
+    statusCode: StatusCodes.OK,
+    success: true,
+    message:
+      'Booking dispute submitted. Admin has been notified for investigation.',
+    data: result,
+  });
+});
+
+// 7. Confirm Completion (Customer)
 const confirmBookingCompletion = catchAsync(
   async (req: Request, res: Response) => {
     const bookingId = req.params.id;
@@ -89,7 +142,8 @@ const confirmBookingCompletion = catchAsync(
     return sendResponse(res, {
       statusCode: StatusCodes.OK,
       success: true,
-      message: 'Booking completion confirmed successfully. Payout sent for admin approval.',
+      message:
+        'Booking completion confirmed successfully. Payout sent for admin approval.',
       data: result,
     });
   },
@@ -193,6 +247,8 @@ export const BookingController = {
   verifyBookingPayment,
   startWork,
   deliverBooking,
+  requestRevision,
+  disputeBooking,
   confirmBookingCompletion,
   approveBookingPayout,
   releaseBookingPayout,

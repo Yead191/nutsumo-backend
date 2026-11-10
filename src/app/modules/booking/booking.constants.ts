@@ -3,8 +3,10 @@ export const BOOKING_STATUSES = {
   CONFIRMED: 'CONFIRMED',
   IN_PROGRESS: 'IN_PROGRESS',
   DELIVERED: 'DELIVERED',
+  REVISION_REQUESTED: 'REVISION_REQUESTED',
   COMPLETED: 'COMPLETED',
   CANCELLED: 'CANCELLED',
+  DISPUTED: 'DISPUTED',
 } as const;
 
 export const BOOKING_PAYMENT_STATUSES = {
@@ -27,4 +29,6 @@ export const BOOKING_SEARCHABLE_FIELDS = [
   'bookingNumber',
   'notes',
   'deliveryNotes',
+  'revisionNotes',
+  'disputeReason',
 ];

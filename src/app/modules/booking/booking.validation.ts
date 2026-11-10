@@ -7,7 +7,32 @@ const deliverBookingValidationSchema = z.object({
         required_error: 'Delivery notes are required',
       })
       .min(5, 'Delivery notes must be at least 5 characters'),
-    workImages: z.array(z.string()).optional(),
+    deliveryProof: z
+      .union([z.array(z.string()), z.string()])
+      .optional(),
+    workImages: z
+      .union([z.array(z.string()), z.string()])
+      .optional(),
+  }),
+});
+
+const requestRevisionValidationSchema = z.object({
+  body: z.object({
+    revisionNotes: z
+      .string({
+        required_error: 'Revision notes are required',
+      })
+      .min(5, 'Revision notes must be at least 5 characters'),
+  }),
+});
+
+const disputeBookingValidationSchema = z.object({
+  body: z.object({
+    reason: z
+      .string({
+        required_error: 'Dispute reason is required',
+      })
+      .min(10, 'Dispute reason must be at least 10 characters'),
   }),
 });
 
@@ -39,6 +64,8 @@ const releasePayoutValidationSchema = z.object({
 
 export const BookingValidation = {
   deliverBookingValidationSchema,
+  requestRevisionValidationSchema,
+  disputeBookingValidationSchema,
   confirmCompletionValidationSchema,
   approvePayoutValidationSchema,
   releasePayoutValidationSchema,

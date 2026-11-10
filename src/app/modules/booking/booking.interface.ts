@@ -5,8 +5,10 @@ export type BookingStatus =
   | 'CONFIRMED'
   | 'IN_PROGRESS'
   | 'DELIVERED'
+  | 'REVISION_REQUESTED'
   | 'COMPLETED'
-  | 'CANCELLED';
+  | 'CANCELLED'
+  | 'DISPUTED';
 
 export type BookingPaymentStatus =
   | 'UNPAID'
@@ -54,7 +56,19 @@ export interface IBooking {
   deliveryNotes?: string;
   deliveryProof?: string[];
 
-  // Customer Feedback & Review
+  // Revision details from Customer
+  revisionNotes?: string;
+  revisionCount?: number;
+
+  // Dispute details
+  disputeReason?: string;
+  disputedBy?: Types.ObjectId | null;
+  disputedAt?: Date | null;
+
+  // Dedicated Review ref
+  review?: Types.ObjectId | null;
+
+  // Customer Feedback & Review (legacy/cache fields)
   customerRating?: number;
   customerFeedback?: string;
 

@@ -281,20 +281,16 @@ Response (200 OK):
 }
 
 ----------------------------------------------------------------------------------------------------
-ACTION A3: "DELIVER WORK" (Submits completed job for customer review)
+ACTION A3: "DELIVER WORK" (Submits completed job with photo proof for customer review)
 ----------------------------------------------------------------------------------------------------
 Method & URL: PATCH /api/v1/booking/6b02f89a45c428cac7e80fa5/deliver
 Headers: Authorization: Bearer <ArtisanToken>
-Content-Type: application/json
+Content-Type: multipart/form-data (Recommended) or application/json
 
-Request Body:
-{
-  "deliveryNotes": "Replaced the damaged P-trap and tested water pressure for 15 minutes. No leaks detected.",
-  "workImages": [
-    "/images/completion-photo-1.jpg",
-    "/images/completion-photo-2.jpg"
-  ]
-}
+Form-Data Fields:
+  - deliveryNotes: "Replaced the damaged P-trap and tested water pressure for 15 minutes. No leaks detected." (string, min 5)
+  - deliveryProof: [File, File] (up to 10 image files via fileUploadHandler)
+  (Or alternatively: data='{"deliveryNotes":"..."}' with file field 'images' or 'deliveryProof')
 
 Response (200 OK):
 {
@@ -306,7 +302,56 @@ Response (200 OK):
     "status": "DELIVERED",
     "deliveredAt": "2026-11-02T14:15:00.000Z",
     "deliveryNotes": "Replaced the damaged P-trap and tested water pressure...",
-    "deliveryProof": ["/images/completion-photo-1.jpg", "/images/completion-photo-2.jpg"]
+    "deliveryProof": ["/deliveryProof/photo-1.jpg", "/deliveryProof/photo-2.jpg"]
+  }
+}
+
+----------------------------------------------------------------------------------------------------
+ACTION C7: "REQUEST REVISION" (Customer asks artisan for changes before completing)
+----------------------------------------------------------------------------------------------------
+Method & URL: PATCH /api/v1/booking/6b02f89a45c428cac7e80fa5/request-revision
+Headers: Authorization: Bearer <CustomerToken>
+Content-Type: application/json
+
+Request Body:
+{
+  "revisionNotes": "The valve still has a tiny drip on the left side. Could you please tighten or check the seal?"
+}
+
+Response (200 OK):
+{
+  "statusCode": 200,
+  "success": true,
+  "message": "Revision requested successfully. Artisan has been notified.",
+  "data": {
+    "_id": "6b02f89a45c428cac7e80fa5",
+    "status": "REVISION_REQUESTED",
+    "revisionCount": 1,
+    "revisionNotes": "The valve still has a tiny drip..."
+  }
+}
+
+----------------------------------------------------------------------------------------------------
+ACTION C8 / A4: "DISPUTE BOOKING" (Customer or Artisan requests Admin intervention)
+----------------------------------------------------------------------------------------------------
+Method & URL: PATCH /api/v1/booking/6b02f89a45c428cac7e80fa5/dispute
+Headers: Authorization: Bearer <CustomerToken or ArtisanToken>
+Content-Type: application/json
+
+Request Body:
+{
+  "reason": "Artisan damaged the adjacent tile while fixing the pipe and refuses to repair it."
+}
+
+Response (200 OK):
+{
+  "statusCode": 200,
+  "success": true,
+  "message": "Booking dispute submitted. Admin has been notified for investigation.",
+  "data": {
+    "_id": "6b02f89a45c428cac7e80fa5",
+    "status": "DISPUTED",
+    "disputeReason": "Artisan damaged the adjacent tile..."
   }
 }
 
@@ -418,7 +463,100 @@ Event                          | In-App Receiver | Email Receiver | Template
 Quotation Accepted             | Artisan & User  | Artisan & User | quotationAcceptedArtisanEmail
 Escrow Payment Completed       | Customer & Pro  | Customer & Pro | bookingEscrowPaymentCustomerEmail / Artisan
 Work Delivered                 | Customer        | Customer       | bookingDeliveredCustomerEmail
+Revision Requested             | Artisan         | -              | -
+Dispute Raised                 | Admins & User   | -              | -
 Completion Confirmed           | Artisan & Admin | Artisan        | bookingCompletionConfirmedArtisanEmail
+Review Submitted               | Artisan         | -              | -
+Review Reply                   | Customer        | -              | -
 Payout Approved                | Artisan         | Artisan        | bookingPayoutApprovedArtisanEmail
 Payout Released                | Artisan         | Artisan        | bookingPayoutReleasedArtisanEmail
+====================================================================================================
+
+
+====================================================================================================
+7. DEDICATED REVIEWS & RATINGS MODULE
+====================================================================================================
+
+----------------------------------------------------------------------------------------------------
+ACTION R1: "SUBMIT REVIEW" (Customer rates completed job)
+----------------------------------------------------------------------------------------------------
+Method & URL: POST /api/v1/review
+Headers: Authorization: Bearer <CustomerToken>
+Content-Type: application/json
+
+Request Body:
+{
+  "booking": "6b02f89a45c428cac7e80fa5",
+  "rating": 5,
+  "comment": "David was punctual, polite, and resolved our plumbing issue with utmost professionalism!",
+  "qualityRating": 5,
+  "communicationRating": 5,
+  "timelinessRating": 5
+}
+
+----------------------------------------------------------------------------------------------------
+PAGE R2: "GET ARTISAN REVIEWS & SUMMARY" (Public / Profile Page)
+----------------------------------------------------------------------------------------------------
+Method & URL: GET /api/v1/review/artisan/:artisanId?page=1&limit=10&rating=5
+Headers: None required (Public)
+
+Response (200 OK):
+{
+  "statusCode": 200,
+  "success": true,
+  "message": "Artisan reviews retrieved successfully",
+  "data": {
+    "summary": {
+      "averageRating": 4.9,
+      "totalReviews": 34,
+      "ratingDistribution": {
+        "5": 30,
+        "4": 3,
+        "3": 1,
+        "2": 0,
+        "1": 0
+      }
+    },
+    "reviews": [
+      {
+        "_id": "6c1234567890abcdef123456",
+        "rating": 5,
+        "comment": "David was punctual...",
+        "customer": {
+          "_id": "670ab3950c4db21cf3e09121",
+          "name": "Sarah Connor",
+          "image": "/uploads/image/avatar.jpg"
+        },
+        "job": {
+          "_id": "6ae5587b45c428cac7e80f79",
+          "title": "Fix Leaking Kitchen Sink"
+        },
+        "reply": {
+          "comment": "Thank you so much Sarah! Glad I could help.",
+          "repliedAt": "2026-11-03T09:00:00.000Z"
+        },
+        "createdAt": "2026-11-02T16:00:00.000Z"
+      }
+    ]
+  },
+  "pagination": { "page": 1, "limit": 10, "total": 34, "totalPage": 4 }
+}
+
+----------------------------------------------------------------------------------------------------
+ACTION R3: "REPLY TO REVIEW" (Artisan response to customer review)
+----------------------------------------------------------------------------------------------------
+Method & URL: PATCH /api/v1/review/:reviewId/reply
+Headers: Authorization: Bearer <ArtisanToken>
+Content-Type: application/json
+
+Request Body:
+{
+  "comment": "Thank you Sarah! It was a pleasure working with you."
+}
+
+----------------------------------------------------------------------------------------------------
+ACTION R4: "GET SINGLE BOOKING REVIEW"
+----------------------------------------------------------------------------------------------------
+Method & URL: GET /api/v1/review/booking/:bookingId
+Headers: Authorization: Bearer <Token>
 ====================================================================================================

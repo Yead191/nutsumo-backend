@@ -28,6 +28,8 @@ import { logger } from '../../../shared/logger';
 import stripe from '../../../config/stripe';
 import config from '../../../config';
 import { handleBookingPayment } from '../../../handlers/handleBookingPayment';
+import { Review } from '../review/review.model';
+import { recalculateArtisanRating } from '../review/review.service';
 
 /**
  * 1. CREATE STRIPE CHECKOUT SESSION (CUSTOMER)
@@ -212,7 +214,11 @@ const startWork = async (bookingId: string, artisanId: string) => {
 const deliverBooking = async (
   bookingId: string,
   artisanId: string,
-  payload: { deliveryNotes: string; workImages?: string[] },
+  payload: {
+    deliveryNotes: string;
+    deliveryProof?: string[] | string;
+    workImages?: string[];
+  },
 ) => {
   const booking = await Booking.findById(bookingId);
   if (!booking) {
@@ -238,7 +244,8 @@ const deliverBooking = async (
 
   if (
     booking.status !== BOOKING_STATUSES.CONFIRMED &&
-    booking.status !== BOOKING_STATUSES.IN_PROGRESS
+    booking.status !== BOOKING_STATUSES.IN_PROGRESS &&
+    booking.status !== BOOKING_STATUSES.REVISION_REQUESTED
   ) {
     throw new ApiError(
       StatusCodes.BAD_REQUEST,
@@ -246,10 +253,16 @@ const deliverBooking = async (
     );
   }
 
+  const proofImages = Array.isArray(payload.deliveryProof)
+    ? payload.deliveryProof
+    : typeof payload.deliveryProof === 'string'
+      ? [payload.deliveryProof]
+      : payload.workImages || [];
+
   booking.status = BOOKING_STATUSES.DELIVERED;
   booking.deliveredAt = new Date();
   booking.deliveryNotes = payload.deliveryNotes;
-  booking.deliveryProof = payload.workImages || [];
+  booking.deliveryProof = proofImages;
   await booking.save();
 
   // Populate details for Notifications & Email
@@ -305,7 +318,142 @@ const deliverBooking = async (
 };
 
 /**
- * 5. CONFIRM COMPLETION (CUSTOMER)
+ * 5. REQUEST REVISION (CUSTOMER)
+ */
+const requestRevision = async (
+  bookingId: string,
+  customerId: string,
+  payload: { revisionNotes: string },
+) => {
+  const booking = await Booking.findById(bookingId);
+  if (!booking) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'Booking not found');
+  }
+
+  if (booking.customer.toString() !== customerId) {
+    throw new ApiError(
+      StatusCodes.FORBIDDEN,
+      'Only the job customer can request revisions',
+    );
+  }
+
+  if (booking.status !== BOOKING_STATUSES.DELIVERED) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      `Cannot request revision for booking with status: ${booking.status}. It must be in DELIVERED status.`,
+    );
+  }
+
+  booking.status = BOOKING_STATUSES.REVISION_REQUESTED;
+  booking.revisionNotes = payload.revisionNotes;
+  booking.revisionCount = (booking.revisionCount || 0) + 1;
+  await booking.save();
+
+  // Populate details for notification
+  const [customer, artisan, job] = await Promise.all([
+    User.findById(booking.customer).select('name email phone'),
+    User.findById(booking.artisan).select('name email phone'),
+    Job.findById(booking.job).select('title'),
+  ]);
+
+  // Kafka Event
+  try {
+    await kafkaProducer.sendMessage('notification', {
+      type: 'BOOKING_REVISION_REQUESTED',
+      data: {
+        bookingId: String(booking._id),
+        bookingNumber: booking.bookingNumber,
+        customerId: String(booking.customer),
+        artisanId: String(booking.artisan),
+        revisionNotes: payload.revisionNotes,
+      },
+    });
+  } catch (err: any) {
+    logger.warn(
+      `[Kafka] Could not publish BOOKING_REVISION_REQUESTED: ${err?.message}`,
+    );
+  }
+
+  // In-App Notification to Artisan
+  await NotificationServices.createNotification({
+    receiver: booking.artisan,
+    title: 'Revision Requested by Customer ⚠️',
+    message: `${customer?.name || 'Customer'} requested revisions on Booking #${booking.bookingNumber}: "${payload.revisionNotes}". Please review and update your delivery.`,
+    refId: booking._id,
+    path: `/pro/jobs/${booking._id}`,
+    seen: false,
+  });
+
+  return booking;
+};
+
+/**
+ * 6. DISPUTE BOOKING (CUSTOMER OR ARTISAN)
+ */
+const disputeBooking = async (
+  bookingId: string,
+  userId: string,
+  payload: { reason: string },
+) => {
+  const booking = await Booking.findById(bookingId);
+  if (!booking) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'Booking not found');
+  }
+
+  const isCustomer = booking.customer.toString() === userId;
+  const isArtisan = booking.artisan.toString() === userId;
+
+  if (!isCustomer && !isArtisan) {
+    throw new ApiError(
+      StatusCodes.FORBIDDEN,
+      'Only the customer or assigned artisan can dispute this booking',
+    );
+  }
+
+  if (
+    booking.status === BOOKING_STATUSES.COMPLETED ||
+    booking.status === BOOKING_STATUSES.CANCELLED
+  ) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      `Cannot dispute a booking that is already ${booking.status}`,
+    );
+  }
+
+  booking.status = BOOKING_STATUSES.DISPUTED;
+  booking.disputeReason = payload.reason;
+  booking.disputedBy = new Types.ObjectId(userId);
+  booking.disputedAt = new Date();
+  await booking.save();
+
+  // Notify Admin
+  await NotificationServices.sendNotificationToAdmins({
+    title: 'Booking Dispute Raised ⚠️',
+    message: `Dispute opened on Booking #${booking.bookingNumber} by ${isCustomer ? 'Customer' : 'Artisan'}. Reason: "${payload.reason}".`,
+    refId: booking._id,
+    path: `/admin/bookings/${booking._id}`,
+  });
+
+  // Notify Counterparty
+  const counterpartyId = isCustomer ? booking.artisan : booking.customer;
+  const counterpartyPath = isCustomer
+    ? `/pro/jobs/${booking._id}`
+    : `/account/bookings/${booking._id}`;
+
+  await NotificationServices.createNotification({
+    receiver: counterpartyId,
+    title: 'Dispute Raised on Booking ⚠️',
+    message: `A dispute was raised on Booking #${booking.bookingNumber}. Nutsumo support has been alerted to review.`,
+    refId: booking._id,
+    path: counterpartyPath,
+    seen: false,
+  });
+
+  return booking;
+};
+
+/**
+ * 7. CONFIRM COMPLETION (CUSTOMER)
  */
 const confirmBookingCompletion = async (
   bookingId: string,
@@ -339,9 +487,31 @@ const confirmBookingCompletion = async (
 
   if (payload.rating) {
     booking.customerRating = payload.rating;
-  }
-  if (payload.feedback) {
-    booking.customerFeedback = payload.feedback;
+    if (payload.feedback) {
+      booking.customerFeedback = payload.feedback;
+    }
+
+    try {
+      let reviewDoc = await Review.findOne({ booking: booking._id });
+      if (!reviewDoc) {
+        reviewDoc = await Review.create({
+          booking: booking._id,
+          job: booking.job,
+          customer: booking.customer,
+          artisan: booking.artisan,
+          rating: payload.rating,
+          comment: payload.feedback || 'Completed successfully',
+          isPublic: true,
+          status: 'ACTIVE',
+        });
+      }
+      booking.review = reviewDoc._id as Types.ObjectId;
+      await recalculateArtisanRating(booking.artisan);
+    } catch (err: any) {
+      logger.warn(
+        `[Review] Could not sync Review during completion: ${err?.message}`,
+      );
+    }
   }
 
   await booking.save();
@@ -350,32 +520,6 @@ const confirmBookingCompletion = async (
   await Job.findByIdAndUpdate(booking.job, {
     status: JOB_STATUSES.COMPLETED,
   });
-
-  // If rating given, update ArtisanProfile stats
-  if (payload.rating) {
-    try {
-      const profile = await ArtisanProfile.findOne({ user: booking.artisan });
-      if (profile) {
-        const currentReviews = profile.reviewsCount || 0;
-        const currentRating = profile.rating || 0;
-        const newReviewsCount = currentReviews + 1;
-        const newRating = Number(
-          (
-            (currentRating * currentReviews + payload.rating) /
-            newReviewsCount
-          ).toFixed(1),
-        );
-
-        profile.rating = newRating;
-        profile.reviewsCount = newReviewsCount;
-        await profile.save();
-      }
-    } catch (err: any) {
-      logger.warn(
-        `[ArtisanProfile] Could not update rating stats: ${err?.message}`,
-      );
-    }
-  }
 
   // Populate for notifications & emails
   const [customer, artisan, job] = await Promise.all([
@@ -716,6 +860,10 @@ const getMyBookings = async (
         path: 'quotation',
         select: 'proposedAmount rateType estimatedDuration message',
       },
+      {
+        path: 'review',
+        select: 'rating comment reply qualityRating communicationRating timelinessRating createdAt',
+      },
     ]),
     query,
   )
@@ -815,6 +963,11 @@ const getSingleBooking = async (
         path: 'payoutReleasedBy',
         select: 'name email',
       },
+      {
+        path: 'review',
+        select:
+          'rating comment qualityRating communicationRating timelinessRating reply createdAt',
+      },
     ])
     .lean();
 
@@ -840,6 +993,8 @@ export const BookingServices = {
   verifyBookingPayment,
   startWork,
   deliverBooking,
+  requestRevision,
+  disputeBooking,
   confirmBookingCompletion,
   approveBookingPayout,
   releaseBookingPayout,
