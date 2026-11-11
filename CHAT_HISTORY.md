@@ -92,6 +92,16 @@ A dedicated module was introduced with the following schema:
 - Enables either the customer or artisan to formally escalate a conflict for administrative mediation before any funds are moved.
 - Sets status to `DISPUTED` and alerts the platform administrative staff.
 
+### E. Statutory Levies & Tax Breakdown (Total 20%)
+- Replaced the previous flat 10% platform fee with statutory compliant breakdown:
+  - **VAT (Value Added Tax):** 15%
+  - **NHIL (National Health Insurance Levy):** 2.5%
+  - **GETFund Levy (Ghana Education Trust Fund Levy):** 2.5%
+  - **Total Statutory Deductions:** 20% (Net 80% Artisan Payout)
+- **Centralized Calculator:** `calculatePlatformFees(amount)` in `booking.constants.ts`.
+- **Database Consistency:** Stored granularly in `Booking` (`vatRate`, `vatAmount`, `nhilRate`, `nhilAmount`, `getFundLevyRate`, `getFundLevyAmount`, `platformFee`, `artisanPayoutAmount`) and `Transaction` models (`vat`, `nhil`, `get_fund_levy`, `platform_fee`).
+- **Audit & Email Receipt:** Payout emails, notification payloads, and invoices render explicit line items for accounting transparency.
+
 ---
 
 ## 5. Complete API Endpoints Reference

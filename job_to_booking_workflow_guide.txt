@@ -21,30 +21,39 @@ for both customers and artisans:
   Step 5: Artisan starts work ("IN_PROGRESS") and marks job as "DELIVERED" with notes & proof images
   Step 6: Customer inspects work and confirms completion ("COMPLETED") + leaves optional rating/feedback
   Step 7: Admin reviews completed booking and approves payout ("APPROVED")
-  Step 8: Platform commission (10%) is deducted and remaining net funds are released to Artisan ("RELEASED")
+  Step 8: Statutory levies & platform fee (Total 20%: VAT 15%, NHIL 2.5%, GETFund 2.5%) are deducted
+          and remaining net funds (80%) are released to Artisan ("RELEASED")
 
 Status Enums:
   - Job Status: 'OPEN' | 'BOOKED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
   - Quotation Status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'WITHDRAWN'
-  - Booking Status: 'AWAITING_PAYMENT' | 'CONFIRMED' | 'IN_PROGRESS' | 'DELIVERED' | 'COMPLETED' | 'CANCELLED'
+  - Booking Status: 'AWAITING_PAYMENT' | 'CONFIRMED' | 'IN_PROGRESS' | 'DELIVERED' | 'REVISION_REQUESTED' | 'COMPLETED' | 'CANCELLED' | 'DISPUTED'
   - Booking Payment Status: 'UNPAID' | 'ESCROW_HELD' | 'PAID' | 'REFUNDED'
   - Booking Payout Status: 'PENDING' | 'APPROVED' | 'RELEASED' | 'REJECTED'
 
 
 ====================================================================================================
-2. ESCROW & FINANCIAL BREAKDOWN
+2. ESCROW & FINANCIAL BREAKDOWN (STATUTORY LEVIES & PLATFORM DEDUCTIONS)
 ====================================================================================================
-Platform Commission Rate: 10% (Default)
+Statutory Rates & Total Platform Deductions:
+  - VAT (Value Added Tax): 15%
+  - NHIL (National Health Insurance Levy): 2.5%
+  - GETFund Levy (Ghana Education Trust Fund Levy): 2.5%
+  - Total Deductions Rate: 20%
 
-Example:
-  Quotation Proposed Amount (Total): $150.00
-  Platform Commission (10%):           $15.00  (Retained by Platform as fee)
-  Artisan Payout Amount (Net):        $135.00  (Released to Artisan upon completion & admin approval)
+Example Calculation:
+  Quotation Proposed Amount (Total):   $150.00
+  - VAT (15%):                          $22.50
+  - NHIL (2.5%):                         $3.75
+  - GETFund Levy (2.5%):                 $3.75
+  -------------------------------------------------------------
+  Total Platform Fee / Deductions (20%):$30.00  (Retained for statutory levies & platform fee)
+  Artisan Payout Amount (Net 80%):     $120.00  (Disbursed to Artisan upon completion & admin approval)
 
 When Customer pays:
   Customer pays full $150.00 -> Held in Platform Escrow (paymentStatus: 'ESCROW_HELD')
 When Admin releases payout:
-  $15.00 Platform Fee is retained -> $135.00 is disbursed to Artisan (payoutStatus: 'RELEASED')
+  $30.00 Total Deductions retained -> $120.00 is disbursed to Artisan (payoutStatus: 'RELEASED')
 
 
 ====================================================================================================
@@ -155,9 +164,15 @@ Response (200 OK):
       "customer": "670ab3950c4db21cf3e09121",
       "artisan": "66fbd75af0c2d63c1c906263",
       "totalAmount": 140,
-      "platformCommissionRate": 10,
-      "platformFee": 14.00,
-      "artisanPayoutAmount": 126.00,
+      "vatRate": 15,
+      "vatAmount": 21.00,
+      "nhilRate": 2.5,
+      "nhilAmount": 3.50,
+      "getFundLevyRate": 2.5,
+      "getFundLevyAmount": 3.50,
+      "platformCommissionRate": 20,
+      "platformFee": 28.00,
+      "artisanPayoutAmount": 112.00,
       "rateType": "FIXED",
       "status": "AWAITING_PAYMENT",
       "paymentStatus": "UNPAID",
@@ -379,9 +394,15 @@ Response (200 OK):
       "artisan": { "name": "David Miller", "email": "david@example.com" },
       "job": { "title": "Fix Leaking Kitchen Sink" },
       "totalAmount": 140,
-      "platformCommissionRate": 10,
-      "platformFee": 14.00,
-      "artisanPayoutAmount": 126.00,
+      "vatRate": 15,
+      "vatAmount": 21.00,
+      "nhilRate": 2.5,
+      "nhilAmount": 3.50,
+      "getFundLevyRate": 2.5,
+      "getFundLevyAmount": 3.50,
+      "platformCommissionRate": 20,
+      "platformFee": 28.00,
+      "artisanPayoutAmount": 112.00,
       "status": "COMPLETED",
       "paymentStatus": "ESCROW_HELD",
       "payoutStatus": "PENDING",

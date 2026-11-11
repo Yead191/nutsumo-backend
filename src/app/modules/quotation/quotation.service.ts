@@ -11,6 +11,7 @@ import {
   BOOKING_STATUSES,
   BOOKING_PAYMENT_STATUSES,
   DEFAULT_PLATFORM_COMMISSION_PERCENTAGE,
+  calculatePlatformFees,
 } from '../booking/booking.constants';
 import { User } from '../user/user.model';
 import { USER_ROLES } from '../../../enums/user';
@@ -552,15 +553,9 @@ const acceptQuotation = async (quotationId: string, customerId: string) => {
       }
     }
 
-    // 6. Create Booking record with Platform Commission & Artisan Payout
+    // 6. Create Booking record with Statutory Tax Breakdown (VAT, NHIL, GETFund) & Artisan Payout
     const bookingNumber = generateBookingNumber();
-    const platformCommissionRate = DEFAULT_PLATFORM_COMMISSION_PERCENTAGE;
-    const platformFee = Number(
-      ((quotation.proposedAmount * platformCommissionRate) / 100).toFixed(2),
-    );
-    const artisanPayoutAmount = Number(
-      (quotation.proposedAmount - platformFee).toFixed(2),
-    );
+    const fees = calculatePlatformFees(quotation.proposedAmount);
 
     let bookingDoc: any;
 
@@ -572,9 +567,15 @@ const acceptQuotation = async (quotationId: string, customerId: string) => {
       artisan: quotation.artisan,
       totalAmount: quotation.proposedAmount,
       rateType: quotation.rateType,
-      platformCommissionRate,
-      platformFee,
-      artisanPayoutAmount,
+      vatRate: fees.vatRate,
+      vatAmount: fees.vatAmount,
+      nhilRate: fees.nhilRate,
+      nhilAmount: fees.nhilAmount,
+      getFundLevyRate: fees.getFundLevyRate,
+      getFundLevyAmount: fees.getFundLevyAmount,
+      platformCommissionRate: fees.platformCommissionRate,
+      platformFee: fees.platformFee,
+      artisanPayoutAmount: fees.artisanPayoutAmount,
       status: BOOKING_STATUSES.AWAITING_PAYMENT,
       paymentStatus: BOOKING_PAYMENT_STATUSES.UNPAID,
     };

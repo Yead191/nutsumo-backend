@@ -1,0 +1,148 @@
+====================================================================================================
+           FRONTEND UPDATE PROMPT: 20% STATUTORY TAXES & PLATFORM DEDUCTIONS BREAKDOWN
+====================================================================================================
+Target: Frontend Developer / AI Assistant working on Nutsumo Frontend (Web & Mobile Apps)
+Subject: Replace flat 10% Platform Fee with Statutory Breakdown (VAT 15%, NHIL 2.5%, GETFund 2.5% = Total 20%)
+
+----------------------------------------------------------------------------------------------------
+INSTRUCTION PROMPT (Copy & paste the text below into your frontend project AI chat or dev task):
+----------------------------------------------------------------------------------------------------
+
+Please update our frontend application (Customer Dashboard, Artisan Pro Dashboard, and Admin Portal)
+to reflect our backend update to the fee and statutory deduction structure. 
+
+Previously, the platform used a flat 10% platform fee.
+Now, the backend has implemented a statutory compliant 20% deduction breakdown:
+  1. VAT (Value Added Tax): 15%
+  2. NHIL (National Health Insurance Levy): 2.5%
+  3. GETFund Levy (Ghana Education Trust Fund Levy): 2.5%
+  --------------------------------------------------------
+  Total Deductions Rate: 20%
+  Artisan Net Take-Home Payout: 80%
+
+====================================================================================================
+1. UPDATED BACKEND API RESPONSE SCHEMA (BOOKINGS & QUOTATION ACCEPTANCE)
+====================================================================================================
+Any Booking object returned by `/api/v1/booking/:id`, `/api/v1/booking/my-bookings`, 
+or upon quotation acceptance `/api/v1/quotation/:id/accept` now includes these exact fields:
+
+```typescript
+interface IBookingFinancials {
+  totalAmount: number;            // e.g. 150.00 (Gross booking total)
+  
+  // New Statutory Breakdown Fields:
+  vatRate: number;                // 15 (representing 15%)
+  vatAmount: number;              // e.g. 22.50
+  nhilRate: number;               // 2.5 (representing 2.5%)
+  nhilAmount: number;             // e.g. 3.75
+  getFundLevyRate: number;        // 2.5 (representing 2.5%)
+  getFundLevyAmount: number;      // e.g. 3.75
+
+  // Summary / Aggregate Fields:
+  platformCommissionRate: number; // 20 (representing 20% total)
+  platformFee: number;            // e.g. 30.00 (Total of VAT + NHIL + GETFund)
+  artisanPayoutAmount: number;    // e.g. 120.00 (Net 80% released to Artisan)
+}
+```
+
+====================================================================================================
+2. CLIENT-SIDE HELPER UTILITY (Add to utils/taxCalculator.ts)
+====================================================================================================
+Please create or update a helper function in the frontend for live fee calculation (e.g. when an artisan
+types a quotation amount or customer views price breakdown):
+
+```typescript
+export const TAX_RATES = {
+  VAT: 15,            // 15%
+  NHIL: 2.5,          // 2.5%
+  GET_FUND_LEVY: 2.5, // 2.5%
+} as const;
+
+export const TOTAL_DEDUCTION_PERCENTAGE = 20;
+
+export interface IFeeBreakdown {
+  grossAmount: number;
+  vatAmount: number;
+  nhilAmount: number;
+  getFundLevyAmount: number;
+  totalDeductions: number;
+  netPayoutAmount: number;
+}
+
+export const calculateFeeBreakdown = (amount: number): IFeeBreakdown => {
+  const safeAmount = Number(amount) || 0;
+  const vatAmount = Number(((safeAmount * TAX_RATES.VAT) / 100).toFixed(2));
+  const nhilAmount = Number(((safeAmount * TAX_RATES.NHIL) / 100).toFixed(2));
+  const getFundLevyAmount = Number(((safeAmount * TAX_RATES.GET_FUND_LEVY) / 100).toFixed(2));
+  const totalDeductions = Number((vatAmount + nhilAmount + getFundLevyAmount).toFixed(2));
+  const netPayoutAmount = Number((safeAmount - totalDeductions).toFixed(2));
+
+  return {
+    grossAmount: safeAmount,
+    vatAmount,
+    nhilAmount,
+    getFundLevyAmount,
+    totalDeductions,
+    netPayoutAmount,
+  };
+};
+```
+
+====================================================================================================
+3. UI / UX SCREENS TO UPDATE
+====================================================================================================
+
+PAGE 1: ARTISAN "SUBMIT QUOTATION" MODAL / PAGE
+- When the Artisan inputs a `proposedAmount` (e.g. $100 or $150), show an interactive "Estimated Earnings Breakdown" card below the input field:
+  * Proposed Total:              $150.00
+  * VAT (15%):                  -$22.50
+  * NHIL (2.5%):                 -$3.75
+  * GETFund Levy (2.5%):         -$3.75
+  * Total Deductions (20%):     -$30.00
+  * --------------------------------------------------
+  * **Your Estimated Net Payout:** $120.00 (Highlighted in Green)
+- Add an info tooltip: "Platform deductions cover statutory taxes & platform services (VAT 15%, NHIL 2.5%, GETFund 2.5%)."
+
+PAGE 2: CUSTOMER BOOKING ACCEPTANCE & CHECKOUT MODAL
+- On checkout / quotation review screen, replace any old "Platform Fee (10%)" row with:
+  * Service Cost:               $150.00
+  * Total Amount Payable:       $150.00 (Escrow Protected)
+- (Note: Customer pays the full proposed amount which includes statutory deductions).
+
+PAGE 3: BOOKING DETAILS PAGE (CUSTOMER & ARTISAN DASHBOARDS)
+- In the "Financial Summary / Escrow Details" card:
+  Replace the single `Platform Fee: $15.00` line with a transparent breakdown table:
+  -------------------------------------------------------------
+  Description                     Rate        Amount
+  -------------------------------------------------------------
+  Gross Booking Amount                       $150.00
+  VAT                            15%         -$22.50
+  NHIL                           2.5%         -$3.75
+  GETFund Levy                   2.5%         -$3.75
+  Total Deductions               20%         -$30.00
+  -------------------------------------------------------------
+  Net Artisan Payout             80%         $120.00
+  -------------------------------------------------------------
+
+PAGE 4: ADMIN BOOKING & PAYOUT MANAGEMENT TABLE
+- In Admin Bookings table and payout approval modal:
+  * Display columns or modal fields for:
+    - Gross Amount: $150.00
+    - VAT (15%): $22.50
+    - NHIL (2.5%): $3.75
+    - GETFund Levy (2.5%): $3.75
+    - Total Fee (20%): $30.00
+    - Net Payout (80%): $120.00
+  * Payout Release button should clearly confirm:
+    "Release Net Payout of $120.00 to Artisan (Retaining $30.00 statutory levies & fees)".
+
+====================================================================================================
+4. VERIFICATION CHECKLIST FOR FRONTEND
+====================================================================================================
+[ ] Update Booking TypeScript types with `vatRate`, `vatAmount`, `nhilRate`, `nhilAmount`, `getFundLevyRate`, `getFundLevyAmount`.
+[ ] No hardcoded `0.10` or `10%` remains in any quotation calculation or UI label.
+[ ] Artisan quote submission shows live earnings calculation based on 20% deductions (80% net).
+[ ] Booking details & invoice modals render the 3 statutory line items cleanly.
+[ ] Mobile responsive layout handles the breakdown table gracefully on small screens.
+====================================================================================================
+

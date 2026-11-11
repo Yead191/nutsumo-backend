@@ -32,10 +32,18 @@ export interface IBooking {
   totalAmount: number;
   rateType: 'HOURLY' | 'DAILY' | 'FIXED';
 
-  // Platform commission and artisan payout
-  platformCommissionRate: number; // e.g. 10 (representing 10%)
-  platformFee: number;            // e.g. 10.00
-  artisanPayoutAmount: number;    // e.g. 90.00
+  // Statutory Levies & Platform Fee Breakdown
+  vatRate: number;            // 15% (VAT)
+  vatAmount: number;          // e.g. 15.00
+  nhilRate: number;           // 2.5% (National Health Insurance Levy)
+  nhilAmount: number;         // e.g. 2.50
+  getFundLevyRate: number;    // 2.5% (Ghana Education Trust Fund Levy)
+  getFundLevyAmount: number;  // e.g. 2.50
+
+  // Total Platform commission and artisan payout
+  platformCommissionRate: number; // 20% (Total: VAT + NHIL + GETFund)
+  platformFee: number;            // e.g. 20.00 (Total statutory deductions)
+  artisanPayoutAmount: number;    // e.g. 80.00 (Net released to Artisan)
 
   status: BookingStatus;
   paymentStatus: BookingPaymentStatus;

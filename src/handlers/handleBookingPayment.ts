@@ -131,6 +131,9 @@ export const handleBookingPayment = async (
       user: booking.customer,
       total_price: booking.totalAmount,
       payment_received: amountReceived,
+      vat: booking.vatAmount,
+      nhil: booking.nhilAmount,
+      get_fund_levy: booking.getFundLevyAmount,
       platform_fee: booking.platformFee,
       transaction_id: paymentTxnId,
       payment_intent_id:

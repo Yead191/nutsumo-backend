@@ -41,6 +41,21 @@ const transactionSchema = new Schema<ITransaction, TransactionModel>(
       type: Schema.Types.ObjectId,
       ref: 'Order',
     },
+    vat: {
+      type: Number,
+      required: false,
+      default: 0,
+    },
+    nhil: {
+      type: Number,
+      required: false,
+      default: 0,
+    },
+    get_fund_levy: {
+      type: Number,
+      required: false,
+      default: 0,
+    },
     platform_fee: {
       type: Number,
       required: false,

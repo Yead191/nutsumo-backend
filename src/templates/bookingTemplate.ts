@@ -311,8 +311,20 @@ export const bookingPayoutReleasedArtisanEmail = (
           <td style="border-bottom: 1px solid #e2e8f0;">$${Number(values.totalAmount).toFixed(2)}</td>
         </tr>
         <tr>
-          <td style="font-weight: 600; border-bottom: 1px solid #e2e8f0; padding-left: 20px;">Platform Commission:</td>
-          <td style="color: #dc2626; border-bottom: 1px solid #e2e8f0;">-$${Number(values.platformFee).toFixed(2)}</td>
+          <td style="font-weight: 600; border-bottom: 1px solid #e2e8f0; padding-left: 20px;">VAT (15%):</td>
+          <td style="color: #dc2626; border-bottom: 1px solid #e2e8f0;">-$${Number(values.vatAmount ?? ((values.totalAmount * 15) / 100)).toFixed(2)}</td>
+        </tr>
+        <tr>
+          <td style="font-weight: 600; border-bottom: 1px solid #e2e8f0; padding-left: 20px;">NHIL (2.5%):</td>
+          <td style="color: #dc2626; border-bottom: 1px solid #e2e8f0;">-$${Number(values.nhilAmount ?? ((values.totalAmount * 2.5) / 100)).toFixed(2)}</td>
+        </tr>
+        <tr>
+          <td style="font-weight: 600; border-bottom: 1px solid #e2e8f0; padding-left: 20px;">GETFund Levy (2.5%):</td>
+          <td style="color: #dc2626; border-bottom: 1px solid #e2e8f0;">-$${Number(values.getFundLevyAmount ?? ((values.totalAmount * 2.5) / 100)).toFixed(2)}</td>
+        </tr>
+        <tr>
+          <td style="font-weight: 600; border-bottom: 1px solid #e2e8f0; padding-left: 20px;">Total Deductions (20%):</td>
+          <td style="color: #dc2626; border-bottom: 1px solid #e2e8f0; font-weight: 600;">-$${Number(values.platformFee).toFixed(2)}</td>
         </tr>
         <tr>
           <td style="font-weight: 700; padding-left: 20px; font-size: 15px; color: #0f172a;">Net Released Payout:</td>

@@ -5,6 +5,7 @@ import {
   BOOKING_PAYMENT_STATUSES,
   BOOKING_PAYOUT_STATUSES,
   DEFAULT_PLATFORM_COMMISSION_PERCENTAGE,
+  TAX_RATES,
 } from './booking.constants';
 
 const bookingSchema = new Schema<IBooking, BookingModel>(
@@ -50,6 +51,36 @@ const bookingSchema = new Schema<IBooking, BookingModel>(
       type: String,
       enum: ['HOURLY', 'DAILY', 'FIXED'],
       required: true,
+    },
+    vatRate: {
+      type: Number,
+      default: TAX_RATES.VAT,
+      min: 0,
+    },
+    vatAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    nhilRate: {
+      type: Number,
+      default: TAX_RATES.NHIL,
+      min: 0,
+    },
+    nhilAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    getFundLevyRate: {
+      type: Number,
+      default: TAX_RATES.GET_FUND_LEVY,
+      min: 0,
+    },
+    getFundLevyAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
     platformCommissionRate: {
       type: Number,

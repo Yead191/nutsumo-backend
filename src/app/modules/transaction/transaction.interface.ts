@@ -12,6 +12,9 @@ export type ITransaction = {
   payment_received: number;
   discount_percentage?: number;
   discount_amount?: number;
+  vat?: number;
+  nhil?: number;
+  get_fund_levy?: number;
   platform_fee?: number;
   transaction_id?: string;
   payment_intent_id?: string;
