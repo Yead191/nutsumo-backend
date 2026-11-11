@@ -53,6 +53,8 @@ const jobPayloadSchema = z.object({
     .max(10, 'Post code cannot exceed 10 characters')
     .optional(),
 
+  selectedArtisan: objectIdSchema.nullable().optional(),
+
   images: z.array(z.string()).optional(),
 });
 

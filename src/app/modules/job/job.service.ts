@@ -1,4 +1,5 @@
 import { Quotation } from '../quotation/quotation.model';
+import { NotificationServices } from '../notification/notification.service';
 import { FilterQuery, Types } from 'mongoose';
 import { StatusCodes } from 'http-status-codes';
 
@@ -67,11 +68,25 @@ const createJob = async (customerId: string, payload: Partial<IJob>) => {
       budget: Number(payload.budget) ?? null,
       preferredDate: payload.preferredDate ?? null,
       status: JOB_STATUSES.OPEN,
+      selectedArtisan: payload.selectedArtisan
+        ? new Types.ObjectId(payload.selectedArtisan)
+        : null,
       images: payload.images ?? [],
       postCode: payload.postCode ?? '',
     };
 
     const job = await Job.create(jobData);
+
+    if (job.selectedArtisan) {
+      await NotificationServices.createNotification({
+        receiver: job.selectedArtisan,
+        title: 'New Direct Job Inquiry! 🎯',
+        message: `A customer requested a custom quote for "${job.title}". Tap to view and send your proposal!`,
+        refId: job._id,
+        path: `/pro/jobs/${job._id}`,
+        seen: false,
+      });
+    }
 
     await kafkaProducer.sendMessage('notification', {
       type: 'JOB_CREATED',

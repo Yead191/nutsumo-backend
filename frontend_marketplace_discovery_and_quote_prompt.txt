@@ -1,0 +1,236 @@
+====================================================================================================
+      NUTSUMO MARKETPLACE: DISCOVERY FUNNEL & DIRECT "REQUEST CUSTOM QUOTE" WORKFLOW
+====================================================================================================
+Target: Frontend Web / Mobile App Developer & AI Coding Assistant
+Subject: Complete Page-by-Page Discovery Journey & Method 1 ("Request Custom Quote") Direct Hiring Flow
+Reference Backend APIs: http://localhost:5000/api/v1 (Nutsumo Backend)
+
+----------------------------------------------------------------------------------------------------
+INSTRUCTION PROMPT (Copy and paste the text below into your frontend project chat):
+----------------------------------------------------------------------------------------------------
+
+Please build/update the consumer marketplace discovery funnel and direct hiring system for Nutsumo,
+modeled after industry leaders like Fiverr (Custom Offers), Upwork (Direct Proposals), and TaskRabbit.
+
+====================================================================================================
+SECTION 1: DISCOVERY FUNNEL ARCHITECTURE & PAGE HIERARCHY
+====================================================================================================
+
+The user journey consists of a 4-step progressive funnel:
+
+  [Page 1: Home Page] 
+         │ (Customer clicks on a Category, e.g. "Plumbing")
+         ▼
+  [Page 2: Category Services Showcase] 
+         │ (Customer clicks on a specific Service, e.g. "Pipe Leak Repair")
+         ▼
+  [Page 3: Service Artisans Listing Page] 
+         │ (Customer filters by location/rating and clicks on an Artisan card)
+         ▼
+  [Page 4: Artisan 360° Public Profile] 
+         │ (Customer reviews Bio, Portfolio, Stats, Reviews, and clicks "Request Custom Quote")
+         ▼
+  [Page 5: Direct Quote Modal & Escrow Order Lifecycle]
+
+----------------------------------------------------------------------------------------------------
+PAGE 1: HOME PAGE (`/`)
+----------------------------------------------------------------------------------------------------
+Key UI Sections:
+1. Hero Search: Search input ("Find plumbers, electricians...") + Location/Postcode input.
+2. Category Grid / Carousel:
+   - Displays all active categories with icon/image and name.
+   - Clicking a category navigates to `/categories/${category._id}` (or slug).
+   - API: `GET /api/v1/category?isActive=true`
+3. Trust Strip: "Verified Professionals • Escrow Protected Payments • Satisfaction Guarantee".
+4. Top Rated Artisans: Carousel of 5-star artisans with verified badges.
+   - API: `GET /api/v1/artisan-profile?sort=-rating&limit=6`
+
+----------------------------------------------------------------------------------------------------
+PAGE 2: CATEGORY SERVICES SHOWCASE (`/categories/:id`)
+----------------------------------------------------------------------------------------------------
+Displays all specialized service types under the chosen category (e.g. Under "Plumbing" -> Pipe Repair,
+Drain Cleaning, Water Heater, Sink Installation).
+Key UI Sections:
+1. Category Header: Name, banner image, and description.
+2. Services Grid:
+   - Each card shows: Service image, title, short description, and "Browse Pros" CTA.
+   - Clicking a service navigates to `/services/${service._id}/pros`.
+   - API: `GET /api/v1/service?category=${categoryId}&isActive=true`
+
+----------------------------------------------------------------------------------------------------
+PAGE 3: SERVICE ARTISANS LISTING PAGE (`/services/:id/pros` or `/search`)
+----------------------------------------------------------------------------------------------------
+Displays all verified professionals offering the selected service.
+Key UI Sections:
+1. Filter & Sort Bar:
+   - Location / Postcode filter
+   - Availability filter (`Available` vs `Booked`)
+   - Rating filter (4.5★+, 4.0★+)
+   - Price Sort (Lowest price, Highest rated, Most completed jobs)
+2. Artisan Result Cards:
+   - Avatar & Verified Pro Badge (blue checkmark if `artisan.verified === true`)
+   - Name & Business Name (e.g., "David Miller • Miller Plumbing Pros")
+   - Rating & Reviews count: "★ 4.9 (42 reviews)"
+   - Completed Jobs badge: "✓ 35 jobs completed"
+   - Rate display: "$35/hr" or "Starting from $50"
+   - Location & distance
+   - Action Buttons:
+     * "View Profile" -> navigates to `/pro/${artisan._id}`
+     * "Request Quote" -> opens the Direct Quote Modal immediately
+   - API: `GET /api/v1/artisan-service?service=${serviceId}&isActive=true`
+
+----------------------------------------------------------------------------------------------------
+PAGE 4: ARTISAN 360° PUBLIC PROFILE (`/pro/:userId`)
+----------------------------------------------------------------------------------------------------
+A complete trust-building profile answering every customer hesitation:
+
+Component 1: Hero Identity Card
+- Large Avatar, Verified Identity Badge, Business Name, Location, Postcode.
+- Status Pill: `🟢 Available for Hire` or `🟡 Currently Booked`.
+- Primary CTAs: **"Request Custom Quote"** (Primary Button) and "Message".
+
+Component 2: Key Metric Stats Strip
+- Star Rating: `4.9 ★` (from `profile.rating`)
+- Total Reviews: `48 Reviews` (from `profile.reviewsCount`)
+- Completed Jobs: `52 Completed` (from `profile.completedJobs`)
+- Trade Experience: `8+ Years` (from `profile.experienceYears`)
+- Starting Rate: `$35/hr` (from `profile.hourlyRate` or `startingRate`)
+- API: `GET /api/v1/artisan-profile/user/${userId}`
+
+Component 3: About & Credentials
+- Detailed Bio, specialized skills, tools used, certifications.
+
+Component 4: Services Offered (Catalog)
+- Table/List of individual services this artisan offers with their exact custom rate:
+  * "Pipe Leak Repair" | $35/hr | [Request Quote]
+  * "Bathroom Sink Installation" | $50 fixed | [Request Quote]
+- API: `GET /api/v1/artisan-service?artisan=${userId}&isActive=true`
+
+Component 5: Interactive Portfolio (Before & After Showcase)
+- Gallery cards showing prior work.
+- Tagged with labels: `Before`, `After`, and `Work`.
+- Includes an interactive slider or side-by-side comparison.
+- API: `GET /api/v1/portfolio/artisan/${userId}`
+
+Component 6: Ratings & Client Reviews
+- Summary Box: Average rating (4.9/5) + Rating distribution bars (5★, 4★, 3★, 2★, 1★).
+- Review Cards:
+  * Customer name, avatar, and date.
+  * Verified Job Title badge: "Reviewed for: Fix Leaking Kitchen Sink".
+  * Star rating & client review comment.
+  * Artisan Reply Box (if artisan responded to feedback).
+- API: `GET /api/v1/review/artisan/${userId}`
+
+
+====================================================================================================
+SECTION 2: METHOD 1 — "REQUEST CUSTOM QUOTE" WORKFLOW (STEP-BY-STEP)
+====================================================================================================
+
+This is the recommended Fiverr Custom Offer / Upwork Direct Proposal workflow:
+
+Step 1: Customer clicks "Request Custom Quote" on Artisan Profile
+- A clean modal opens with the Artisan's identity pinned at the top:
+  "Request a Custom Quote from [Artisan Name]".
+- Form Fields:
+  * Service (Dropdown pre-selected if clicked from a specific service row)
+  * Project Title: (e.g. "Repair master bathroom pipe leak")
+  * Detailed Description: (Explain what is needed, min 10 chars)
+  * Location / Address & Postcode
+  * Preferred Date & Time: (Date picker)
+  * Estimated Budget ($): (Optional / Customer's expectation)
+  * Upload Photos of the Issue: (Multipart file upload, up to 10 photos)
+
+Step 2: Submit Direct Job Request to Backend
+- Method & URL: `POST /api/v1/job`
+- Content-Type: `multipart/form-data`
+- Headers: `Authorization: Bearer <CustomerToken>`
+- Payload:
+  * `title`: "Repair master bathroom pipe leak"
+  * `description`: "Water is dripping under the cabinet..."
+  * `category`: "<categoryId>"
+  * `service`: "<serviceId>"
+  * `selectedArtisan`: "<artisanUserId>"  <--- PINS JOB DIRECTLY TO THIS ARTISAN
+  * `location`: "123 Main St, New York, NY"
+  * `postCode`: "10001"
+  * `budget`: 120
+  * `preferredDate`: "2026-11-20T10:00:00.000Z"
+  * `images`: [File, File]
+
+Step 3: Artisan Receives Direct Notification
+- Backend automatically triggers an In-App Notification and Kafka Event to the artisan:
+  "New Direct Job Inquiry! 🎯: A customer requested a custom quote for 'Repair master bathroom pipe leak'."
+- Artisan views job details at `/pro/jobs/:jobId`.
+
+Step 4: Artisan Submits Official Quotation / Offer
+- Artisan enters their proposed pricing and timeline.
+- Method & URL: `POST /api/v1/quotation`
+- Headers: `Authorization: Bearer <ArtisanToken>`
+- Payload:
+  ```json
+  {
+    "job": "<jobId>",
+    "proposedAmount": 140,
+    "rateType": "FIXED",
+    "estimatedDuration": "2 hours",
+    "message": "I can bring replacement copper seals and complete this tomorrow at 10 AM."
+  }
+  ```
+
+Step 5: Customer Reviews Quotation with 20% Statutory Breakdown
+- Customer receives notification: "Artisan sent you a quotation for $140.00".
+- Customer navigates to `/account/jobs/:jobId/proposals`.
+- Proposal card displays transparent breakdown:
+  * Proposed Amount:           $140.00
+  * VAT (15%):                 -$21.00
+  * NHIL (2.5%):                -$3.50
+  * GETFund Levy (2.5%):        -$3.50
+  * Total Platform Deductions: -$28.00
+  * Artisan Net Payout:        $112.00
+  * Customer Pays:             $140.00 (Escrow Protected)
+
+Step 6: Customer Accepts Quotation & Pays via Stripe Escrow
+- Customer clicks "Accept & Pay Escrow".
+- Method & URL: `PATCH /api/v1/quotation/:quotationId/accept`
+- Headers: `Authorization: Bearer <CustomerToken>`
+- Response (200 OK):
+  ```json
+  {
+    "success": true,
+    "message": "Quotation accepted successfully. Please complete payment to confirm booking.",
+    "data": {
+      "booking": {
+        "_id": "6b02f89a45c428cac7e80fa5",
+        "bookingNumber": "BK-280fa5-4819",
+        "status": "AWAITING_PAYMENT",
+        "totalAmount": 140
+      },
+      "checkoutUrl": "https://checkout.stripe.com/c/pay/cs_test_..."
+    }
+  }
+  ```
+- Frontend immediately redirects customer to `checkoutUrl`.
+
+Step 7: Payment Success & Order In-Progress
+- Stripe webhook confirms payment -> Booking moves to `CONFIRMED` (`paymentStatus: ESCROW_HELD`).
+- Artisan receives "Escrow Secured! 💰" notification and starts work (`IN_PROGRESS`).
+
+
+====================================================================================================
+SECTION 3: FRONTEND API CHEAT-SHEET
+====================================================================================================
+
+| Action / Screen | HTTP Method & URL | Auth Required | Description |
+|---|---|---|---|
+| Get Active Categories | `GET /api/v1/category?isActive=true` | No | Home Page category list |
+| Get Category Services | `GET /api/v1/service?category=:id&isActive=true` | No | Services under category |
+| Get Service Artisans | `GET /api/v1/artisan-service?service=:id&isActive=true` | No | Artisans providing service |
+| Get Artisan Profile | `GET /api/v1/artisan-profile/user/:userId` | No | Bio, stats, rating, experience |
+| Get Artisan Services | `GET /api/v1/artisan-service?artisan=:userId&isActive=true` | No | Custom rates per service |
+| Get Artisan Portfolio | `GET /api/v1/portfolio/artisan/:userId` | No | Before/After work photos |
+| Get Artisan Reviews | `GET /api/v1/review/artisan/:userId` | No | Reviews, ratings & 5★ breakdown |
+| Submit Direct Quote Req| `POST /api/v1/job` (with `selectedArtisan`) | Customer | Customer requests quote |
+| Artisan Submits Quote | `POST /api/v1/quotation` | Artisan | Artisan sends proposed price |
+| Accept Quote & Checkout| `PATCH /api/v1/quotation/:id/accept` | Customer | Creates booking & returns Stripe URL |
+| Get Booking Details | `GET /api/v1/booking/:id` | Customer/Artisan | Realtime booking status & escrow info |
+====================================================================================================
+
