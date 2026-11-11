@@ -12,6 +12,7 @@ import { kafkaProducer } from '../../../tools/kafka/kafka-producers/kafka.produc
 import { logger } from '../../../shared/logger';
 import { User } from '../user/user.model';
 import { Job } from '../job/job.model';
+import { USER_ROLES } from '../../../enums/user';
 
 /**
  * Helper to recalculate aggregate rating and review count for an Artisan
@@ -214,6 +215,10 @@ const getArtisanReviews = async (
       isPublic: true,
     }).populate([
       {
+        path: 'artisan',
+        select: 'name image location',
+      },
+      {
         path: 'customer',
         select: 'name image location',
       },
@@ -318,13 +323,17 @@ const getMyReviews = async (
   role: string,
   query: Record<string, any>,
 ) => {
-  const isArtisan = role === 'ARTISAN';
+  const isArtisan = role === USER_ROLES.ARTISAN;
   const filterKey = isArtisan ? 'artisan' : 'customer';
 
   const qb = new QueryBuilder(
     Review.find({ [filterKey]: new Types.ObjectId(userId) }).populate([
       {
-        path: isArtisan ? 'customer' : 'artisan',
+        path: 'artisan',
+        select: 'name image location verified',
+      },
+      {
+        path: 'customer',
         select: 'name image location verified',
       },
       {
