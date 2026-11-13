@@ -150,7 +150,7 @@ const getAllArtisanServices = async (query: Record<string, unknown> = {}) => {
   const results = await ArtisanService.find(filter)
     .populate(
       'artisan',
-      'name email profileImage trade location phoneNumber businessName identityStatus verified',
+      'name email image trade location phoneNumber businessName identityStatus verified',
     )
     .populate({
       path: 'service',
@@ -171,7 +171,7 @@ const getSingleArtisanService = async (
   const result = await ArtisanService.findById(id)
     .populate(
       'artisan',
-      'name email profileImage trade location phoneNumber businessName identityStatus verified',
+      'name email image trade location phoneNumber businessName identityStatus verified',
     )
     .populate({
       path: 'service',
