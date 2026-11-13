@@ -78,6 +78,22 @@ const updateArtisanService = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const reviewArtisanService = catchAsync(async (req: Request, res: Response) => {
+  const result = await ArtisanServiceServices.reviewArtisanService(
+    req.params.id,
+    req.body,
+  );
+  return sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message:
+      req.body.decision === 'APPROVE'
+        ? 'Custom service approved and added to the catalog'
+        : 'Custom service rejected',
+    data: result,
+  });
+});
+
 const deleteArtisanService = catchAsync(async (req: Request, res: Response) => {
   const result = await ArtisanServiceServices.deleteArtisanService(
     req.params.id,
@@ -100,4 +116,5 @@ export const ArtisanServiceController = {
   getSingleArtisanService,
   updateArtisanService,
   deleteArtisanService,
+  reviewArtisanService,
 };

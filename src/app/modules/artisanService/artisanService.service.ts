@@ -7,8 +7,52 @@ import { Service } from '../service/service.model';
 import { Category } from '../category/category.model';
 import { User } from '../user/user.model';
 import { USER_ROLES } from '../../../enums/user';
+import { generateSlug } from '../category/category.service';
+import { normalizeServiceName } from './serviceMatch';
+
+const populateOffering = (id: mongoose.Types.ObjectId | string) =>
+  ArtisanService.findById(id)
+    .populate({
+      path: 'service',
+      populate: { path: 'category', select: 'name slug image isActive' },
+    })
+    .populate('category', 'name slug image isActive');
 
 const createArtisanService = async (
+  artisanId: string,
+  payload: {
+    service?: string;
+    category?: string;
+    customName?: string;
+    proposedCategory?: string;
+    rateAmount: number;
+    rateType: 'HOURLY' | 'DAILY';
+    isActive?: boolean;
+    description?: string;
+  },
+): Promise<IArtisanService> => {
+  if (payload.service) {
+    return createCatalogSelection(artisanId, {
+      service: payload.service,
+      rateAmount: payload.rateAmount,
+      rateType: payload.rateType,
+      isActive: payload.isActive,
+      description: payload.description,
+    });
+  }
+
+  return createCustomService(artisanId, {
+    category: payload.category || '',
+    customName: payload.customName || '',
+    proposedCategory: payload.proposedCategory || '',
+    rateAmount: payload.rateAmount,
+    rateType: payload.rateType,
+    isActive: payload.isActive,
+    description: payload.description,
+  });
+};
+
+const createCatalogSelection = async (
   artisanId: string,
   payload: {
     service: string;
@@ -72,17 +116,126 @@ const createArtisanService = async (
   // 6. Requirement: Store selection in separate collection, never modify catalog service
   const result = await ArtisanService.create({
     artisan: artisanId,
+    source: 'CATALOG',
     service: payload.service,
+    category: service.category,
+    customName: service.name,
+    normalizedName: normalizeServiceName(service.name),
+    reviewStatus: 'APPROVED',
     rateAmount: payload.rateAmount,
     rateType: payload.rateType,
     description: payload.description || '',
     isActive: payload.isActive !== undefined ? payload.isActive : true,
   });
 
-  return await result.populate({
-    path: 'service',
-    populate: { path: 'category', select: 'name slug image isActive' },
+  const populated = await populateOffering(result._id);
+  if (!populated) {
+    throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, 'Failed to save service');
+  }
+  return populated;
+};
+
+const createCustomService = async (
+  artisanId: string,
+  payload: {
+    category?: string;
+    customName: string;
+    proposedCategory?: string;
+    rateAmount: number;
+    rateType: 'HOURLY' | 'DAILY';
+    isActive?: boolean;
+    description?: string;
+  },
+): Promise<IArtisanService> => {
+  if (!mongoose.Types.ObjectId.isValid(artisanId)) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid artisan ID');
+  }
+
+  const artisan = await User.findById(artisanId);
+  if (!artisan) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'Artisan not found');
+  }
+
+  const customName = payload.customName.trim();
+  const normalizedName = normalizeServiceName(customName);
+  if (!normalizedName) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Custom service name is required');
+  }
+
+  const proposedCategory = payload.proposedCategory?.trim() || '';
+  let category = null;
+
+  if (payload.category && mongoose.Types.ObjectId.isValid(payload.category)) {
+    category = await Category.findById(payload.category);
+    if (!category || !category.isActive) {
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        'Selected category is unavailable',
+      );
+    }
+  } else if (proposedCategory) {
+    const activeCategories = await Category.find({ isActive: true }).select('name');
+    category =
+      activeCategories.find(
+        item => normalizeServiceName(item.name) === normalizeServiceName(proposedCategory),
+      ) || null;
+  }
+
+  if (category) {
+    const catalogServices = await Service.find({
+      category: category._id,
+      isActive: true,
+    }).select('name category isActive');
+
+    const officialMatch = catalogServices.find(
+      item => normalizeServiceName(item.name) === normalizedName,
+    );
+
+    if (officialMatch) {
+      return createCatalogSelection(artisanId, {
+        service: String(officialMatch._id),
+        rateAmount: payload.rateAmount,
+        rateType: payload.rateType,
+        isActive: payload.isActive,
+        description: payload.description,
+      });
+    }
+  }
+
+  const existingCustom = await ArtisanService.findOne({
+    artisan: artisanId,
+    normalizedName,
+    source: 'CUSTOM',
+    ...(category
+      ? { category: category._id }
+      : { $or: [{ category: null }, { category: { $exists: false } }] }),
   });
+  if (existingCustom) {
+    throw new ApiError(
+      StatusCodes.CONFLICT,
+      'You already offer this custom service',
+    );
+  }
+
+  const result = await ArtisanService.create({
+    artisan: artisanId,
+    source: 'CUSTOM',
+    category: category?._id,
+    proposedCategory: category ? '' : proposedCategory,
+    customName,
+    normalizedName,
+    reviewStatus: 'PENDING_REVIEW',
+    rateAmount: payload.rateAmount,
+    rateType: payload.rateType,
+    description: payload.description || '',
+    isActive: payload.isActive !== undefined ? payload.isActive : true,
+  });
+
+  const populated = await populateOffering(result._id);
+  if (!populated) {
+    throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, 'Failed to save service');
+  }
+  return populated;
 };
 
 const getMyServices = async (artisanId: string) => {
@@ -95,6 +248,7 @@ const getMyServices = async (artisanId: string) => {
       path: 'service',
       populate: { path: 'category' },
     })
+    .populate('category', 'name slug image isActive')
     .sort({ createdAt: -1 });
 
   return services;
@@ -109,17 +263,27 @@ const getArtisanServices = async (artisanId: string) => {
   const services = await ArtisanService.find({
     artisan: artisanId,
     isActive: true,
-  }).populate({
-    path: 'service',
-    match: { isActive: true },
-    populate: {
+    reviewStatus: { $ne: 'REJECTED' },
+  })
+    .populate({
+      path: 'service',
+      match: { isActive: true },
+      populate: {
+        path: 'category',
+        match: { isActive: true },
+      },
+    })
+    .populate({
       path: 'category',
       match: { isActive: true },
-    },
-  });
+    });
 
-  // Filter out any where service or category might be inactive
-  return services.filter(s => s.service && (s.service as any).category);
+  return services.filter(item => {
+    if ((item.source || 'CATALOG') === 'CUSTOM') {
+      return Boolean(item.customName);
+    }
+    return Boolean(item.service && (item.service as any).category);
+  });
 };
 
 const getAllArtisanServices = async (query: Record<string, unknown> = {}) => {
@@ -156,6 +320,7 @@ const getAllArtisanServices = async (query: Record<string, unknown> = {}) => {
       path: 'service',
       populate: { path: 'category', select: 'name slug image isActive' },
     })
+    .populate('category', 'name slug image isActive')
     .sort({ createdAt: -1 });
 
   return results;
@@ -197,6 +362,7 @@ const updateArtisanService = async (
     rateType?: 'HOURLY' | 'DAILY';
     isActive?: boolean;
     description?: string;
+    customName?: string;
   },
 ): Promise<IArtisanService | null> => {
   if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -223,8 +389,9 @@ const updateArtisanService = async (
     );
   }
 
-  // If activating, verify underlying catalog service and category are still active
-  if (payload.isActive === true) {
+  const source = artisanService.source || 'CATALOG';
+
+  if (payload.isActive === true && source !== 'CUSTOM') {
     const service = await Service.findById(artisanService.service);
     if (!service || !service.isActive) {
       throw new ApiError(
@@ -241,6 +408,22 @@ const updateArtisanService = async (
     }
   }
 
+  if (payload.isActive === true && source === 'CUSTOM') {
+    if (artisanService.reviewStatus === 'REJECTED') {
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        'This custom service was rejected. Submit a new one to offer it again',
+      );
+    }
+    const category = await Category.findById(artisanService.category);
+    if (!category || !category.isActive) {
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        'Cannot activate: the category for this service is currently deactivated by admin',
+      );
+    }
+  }
+
   // Never modifies the catalog service! Only updates the artisan's selection
   const updateData: Partial<IArtisanService> = {};
   if (payload.rateAmount !== undefined)
@@ -249,6 +432,29 @@ const updateArtisanService = async (
   if (payload.description !== undefined)
     updateData.description = payload.description;
   if (payload.isActive !== undefined) updateData.isActive = payload.isActive;
+  if (
+    payload.customName &&
+    source === 'CUSTOM' &&
+    artisanService.reviewStatus !== 'APPROVED'
+  ) {
+    const customName = payload.customName.trim();
+    const normalizedName = normalizeServiceName(customName);
+    const duplicate = await ArtisanService.findOne({
+      _id: { $ne: artisanService._id },
+      artisan: artisanService.artisan,
+      category: artisanService.category,
+      normalizedName,
+      source: 'CUSTOM',
+    });
+    if (duplicate) {
+      throw new ApiError(
+        StatusCodes.CONFLICT,
+        'You already offer this custom service in the selected category',
+      );
+    }
+    updateData.customName = customName;
+    updateData.normalizedName = normalizedName;
+  }
 
   const result = await ArtisanService.findByIdAndUpdate(id, updateData, {
     new: true,
@@ -319,6 +525,110 @@ const deleteArtisanService = async (
   return result;
 };
 
+const reviewArtisanService = async (
+  id: string,
+  payload: { decision: 'APPROVE' | 'REJECT'; reason?: string },
+) => {
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid artisan service ID');
+  }
+
+  const offering = await ArtisanService.findById(id);
+  if (!offering) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'Artisan service not found');
+  }
+  if (offering.source !== 'CUSTOM') {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'Only custom services need catalog review',
+    );
+  }
+
+  if (payload.decision === 'REJECT') {
+    offering.reviewStatus = 'REJECTED';
+    offering.isActive = false;
+    offering.rejectionReason = payload.reason?.trim() || '';
+    await offering.save();
+    return populateOffering(offering._id);
+  }
+
+  let category = offering.category
+    ? await Category.findById(offering.category)
+    : null;
+
+  if (!category && offering.proposedCategory) {
+    const proposedName = offering.proposedCategory.trim();
+    const activeCategories = await Category.find({ isActive: true }).select('name slug');
+    category =
+      activeCategories.find(
+        item => normalizeServiceName(item.name) === normalizeServiceName(proposedName),
+      ) || null;
+
+    if (!category) {
+      category = await Category.create({
+        name: proposedName,
+        slug: generateSlug(proposedName),
+        isActive: true,
+      });
+    }
+    offering.category = category._id;
+  }
+
+  if (!category || !category.isActive) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'Cannot approve a service until it has an active category',
+    );
+  }
+
+  const normalizedName =
+    offering.normalizedName || normalizeServiceName(offering.customName);
+  const catalogServices = await Service.find({
+    category: category._id,
+    isActive: true,
+  });
+  let catalogService =
+    catalogServices.find(
+      item => normalizeServiceName(item.name) === normalizedName,
+    ) || null;
+
+  if (!catalogService) {
+    const slug = generateSlug(offering.customName || 'custom-service');
+    try {
+      catalogService = await Service.create({
+        name: offering.customName,
+        slug,
+        category: category._id,
+        description: offering.description || '',
+        isActive: true,
+      });
+    } catch (error) {
+      catalogService = await Service.findOne({ category: category._id, slug });
+      if (!catalogService) throw error;
+    }
+  }
+
+  const alreadyLinked = await ArtisanService.findOne({
+    _id: { $ne: offering._id },
+    artisan: offering.artisan,
+    service: catalogService._id,
+  });
+  if (alreadyLinked) {
+    await ArtisanService.findByIdAndDelete(offering._id);
+    return populateOffering(alreadyLinked._id);
+  }
+
+  offering.source = 'CATALOG';
+  offering.service = catalogService._id;
+  offering.reviewStatus = 'APPROVED';
+  offering.rejectionReason = '';
+  offering.customName = catalogService.name;
+  offering.normalizedName = normalizeServiceName(catalogService.name);
+  await offering.save();
+
+  return populateOffering(offering._id);
+};
+
 export const ArtisanServiceServices = {
   createArtisanService,
   getMyServices,
@@ -327,4 +637,5 @@ export const ArtisanServiceServices = {
   getSingleArtisanService,
   updateArtisanService,
   deleteArtisanService,
+  reviewArtisanService,
 };

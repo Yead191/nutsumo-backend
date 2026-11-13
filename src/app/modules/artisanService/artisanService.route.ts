@@ -27,6 +27,12 @@ router
   .route('/artisan/:artisanId')
   .get(ArtisanServiceController.getArtisanServices);
 
+router.route('/:id/review').patch(
+  auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN),
+  validateRequest(ArtisanServiceValidation.reviewArtisanServiceZodSchema),
+  ArtisanServiceController.reviewArtisanService,
+);
+
 router
   .route('/:id')
   .get(ArtisanServiceController.getSingleArtisanService)

@@ -4,7 +4,7 @@ import { RateType } from '../artisanService/artisanService.interface';
 export interface IJobMatch {
   artisan: Types.ObjectId;
   artisanService: Types.ObjectId;
-  service: Types.ObjectId;
+  service?: Types.ObjectId | null;
   rateAmount: number;
   rateType: RateType;
   matchScore: number;
