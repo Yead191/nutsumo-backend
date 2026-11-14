@@ -30,6 +30,7 @@ import config from '../../../config';
 import { handleBookingPayment } from '../../../handlers/handleBookingPayment';
 import { Review } from '../review/review.model';
 import { recalculateArtisanRating } from '../review/review.service';
+import { WalletServices } from '../wallet/wallet.service';
 
 /**
  * 1. CREATE STRIPE CHECKOUT SESSION (CUSTOMER)
@@ -550,7 +551,7 @@ const confirmBookingCompletion = async (
   await NotificationServices.createNotification({
     receiver: booking.artisan,
     title: 'Customer Confirmed Completion! 🎉',
-    message: `${customer?.name || 'Customer'} confirmed completion of Booking #${booking.bookingNumber}. Payout ($${Number(booking.artisanPayoutAmount).toFixed(2)}) is awaiting Admin approval.`,
+    message: `${customer?.name || 'Customer'} confirmed completion of Booking #${booking.bookingNumber}. GH₵ ${Number(booking.artisanPayoutAmount).toFixed(2)} waits for admin approval, then lands in your Nutsumo balance.`,
     refId: booking._id,
     path: `/pro/jobs/${booking._id}`,
     seen: false,
@@ -647,7 +648,7 @@ const approveBookingPayout = async (
   await NotificationServices.createNotification({
     receiver: booking.artisan,
     title: 'Payout Approved! 🛡️',
-    message: `Admin approved your payout of $${Number(booking.artisanPayoutAmount).toFixed(2)} for Booking #${booking.bookingNumber}. Release will occur shortly.`,
+    message: `Admin approved GH₵ ${Number(booking.artisanPayoutAmount).toFixed(2)} for Booking #${booking.bookingNumber}. It moves into your Nutsumo balance when the desk releases it.`,
     refId: booking._id,
     path: `/pro/jobs/${booking.job}`,
     seen: false,
@@ -697,61 +698,45 @@ const releaseBookingPayout = async (
     );
   }
 
+  if (booking.payoutStatus !== BOOKING_PAYOUT_STATUSES.APPROVED) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'Approve the payout before releasing it into the artisan balance.',
+    );
+  }
+
   const artisanUser = await User.findById(booking.artisan);
   if (!artisanUser) {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Artisan not found');
   }
 
-  let payoutTransferId = '';
-  let payoutMethod = payload.payoutMethod || 'MANUAL_BANK';
+  const credit = await WalletServices.creditReleasedPayout({
+    _id: booking._id as Types.ObjectId,
+    artisan: booking.artisan as Types.ObjectId,
+    artisanPayoutAmount: booking.artisanPayoutAmount,
+    bookingNumber: booking.bookingNumber,
+  });
+  const payoutTransferId = `WALLET-${booking.bookingNumber}`;
+  const payoutMethod = 'WALLET';
 
-  // If artisan has Stripe Connect account connected, attempt automated transfer
-  if (artisanUser.stripeAccountInfo?.accountId) {
-    try {
-      const transfer = await stripe.transfers.create({
-        amount: Math.round(booking.artisanPayoutAmount * 100),
-        currency: 'usd',
-        destination: artisanUser.stripeAccountInfo.accountId,
-        description: `Payout for Booking #${booking.bookingNumber}`,
-        metadata: {
-          bookingId: booking._id.toString(),
-          bookingNumber: booking.bookingNumber,
-          artisanId: booking.artisan.toString(),
-        },
-      });
-
-      payoutTransferId = transfer.id;
-      payoutMethod = 'STRIPE_TRANSFER';
-    } catch (transferErr: any) {
-      logger.warn(
-        `[StripeTransfer] Automated transfer failed: ${transferErr?.message}. Falling back to manual settlement reference.`,
-      );
-      payoutTransferId = `PAYOUT-${booking.bookingNumber}-${Date.now()}`;
-      payoutMethod = payload.payoutMethod || 'MANUAL_SETTLEMENT';
-    }
-  } else {
-    payoutTransferId = `PAYOUT-${booking.bookingNumber}-${Date.now()}`;
-    payoutMethod = payload.payoutMethod || 'MANUAL_BANK';
+  if (!credit.alreadyCredited) {
+    await Transaction.create({
+      user: booking.artisan,
+      total_price: booking.artisanPayoutAmount,
+      payment_received: booking.artisanPayoutAmount,
+      vat: booking.vatAmount,
+      nhil: booking.nhilAmount,
+      get_fund_levy: booking.getFundLevyAmount,
+      platform_fee: booking.platformFee,
+      transaction_id: payoutTransferId,
+      payment_method: payoutMethod,
+      status: TRANSACTION_STATUS.SUCCESS,
+      type: TRANSACTION_TYPE.CREDIT,
+      category: TRANSACTION_CATEGORY.SERVICE,
+      order: booking._id,
+    });
   }
 
-  // Create Payout Transaction record in Transaction model
-  await Transaction.create({
-    user: booking.artisan,
-    total_price: booking.artisanPayoutAmount,
-    payment_received: booking.artisanPayoutAmount,
-    vat: booking.vatAmount,
-    nhil: booking.nhilAmount,
-    get_fund_levy: booking.getFundLevyAmount,
-    platform_fee: booking.platformFee,
-    transaction_id: payoutTransferId,
-    payment_method: payoutMethod,
-    status: TRANSACTION_STATUS.SUCCESS,
-    type: TRANSACTION_TYPE.DEBIT,
-    category: TRANSACTION_CATEGORY.SERVICE,
-    order: booking._id,
-  });
-
-  // Update Booking
   booking.payoutStatus = BOOKING_PAYOUT_STATUSES.RELEASED;
   booking.payoutReleasedAt = new Date();
   booking.payoutReleasedBy = new Types.ObjectId(adminId);
@@ -805,9 +790,9 @@ const releaseBookingPayout = async (
   await NotificationServices.createNotification({
     receiver: booking.artisan,
     title: 'Payout Released! 💵',
-    message: `Your net payout of $${Number(booking.artisanPayoutAmount).toFixed(2)} for Booking #${booking.bookingNumber} has been released (Total 20% statutory deductions: VAT 15%, NHIL 2.5%, GETFund 2.5% = $${Number(booking.platformFee).toFixed(2)}).`,
+    message: `GH₵ ${Number(booking.artisanPayoutAmount).toFixed(2)} from Booking #${booking.bookingNumber} is now in your Nutsumo balance. Withdraw it from Overview to your bank or mobile money.`,
     refId: booking._id,
-    path: `/artisan/bookings/${booking._id}`,
+    path: '/pro',
     seen: false,
   });
 
@@ -824,6 +809,7 @@ const releaseBookingPayout = async (
       nhilAmount: booking.nhilAmount,
       getFundLevyAmount: booking.getFundLevyAmount,
       platformFee: booking.platformFee,
+      platformServiceFeeAmount: booking.platformServiceFeeAmount,
       netPayoutAmount: booking.artisanPayoutAmount,
       payoutMethod,
       payoutTransferId,

@@ -23,15 +23,19 @@ export const BOOKING_PAYOUT_STATUSES = {
   REJECTED: 'REJECTED',
 } as const;
 
-// Statutory Tax & Levy Rates (Total: 20%)
+// Statutory levies 20% plus Nutsumo platform fee 2.5% = 22.5% total.
 export const TAX_RATES = {
-  VAT: 15,            // 15% Value Added Tax
-  NHIL: 2.5,          // 2.5% National Health Insurance Levy
-  GET_FUND_LEVY: 2.5, // 2.5% Ghana Education Trust Fund Levy
+  VAT: 15,
+  NHIL: 2.5,
+  GET_FUND_LEVY: 2.5,
+  PLATFORM: 2.5,
 } as const;
 
+export const STATUTORY_DEDUCTION_PERCENTAGE =
+  TAX_RATES.VAT + TAX_RATES.NHIL + TAX_RATES.GET_FUND_LEVY;
+export const PLATFORM_FEE_PERCENTAGE = TAX_RATES.PLATFORM;
 export const DEFAULT_PLATFORM_COMMISSION_PERCENTAGE =
-  TAX_RATES.VAT + TAX_RATES.NHIL + TAX_RATES.GET_FUND_LEVY; // 20%
+  STATUTORY_DEDUCTION_PERCENTAGE + PLATFORM_FEE_PERCENTAGE;
 
 export interface IPlatformFeeBreakdown {
   vatRate: number;
@@ -40,15 +44,13 @@ export interface IPlatformFeeBreakdown {
   nhilAmount: number;
   getFundLevyRate: number;
   getFundLevyAmount: number;
+  platformServiceFeeRate: number;
+  platformServiceFeeAmount: number;
   platformCommissionRate: number;
   platformFee: number;
   artisanPayoutAmount: number;
 }
 
-/**
- * Enterprise fee and statutory deduction calculator
- * Calculates VAT (15%), NHIL (2.5%), and GETFund Levy (2.5%) = 20% Total
- */
 export const calculatePlatformFees = (amount: number): IPlatformFeeBreakdown => {
   const safeAmount = Number(amount) || 0;
   const vatAmount = Number(((safeAmount * TAX_RATES.VAT) / 100).toFixed(2));
@@ -56,8 +58,11 @@ export const calculatePlatformFees = (amount: number): IPlatformFeeBreakdown => 
   const getFundLevyAmount = Number(
     ((safeAmount * TAX_RATES.GET_FUND_LEVY) / 100).toFixed(2),
   );
+  const platformServiceFeeAmount = Number(
+    ((safeAmount * TAX_RATES.PLATFORM) / 100).toFixed(2),
+  );
   const platformFee = Number(
-    (vatAmount + nhilAmount + getFundLevyAmount).toFixed(2),
+    (vatAmount + nhilAmount + getFundLevyAmount + platformServiceFeeAmount).toFixed(2),
   );
   const artisanPayoutAmount = Number((safeAmount - platformFee).toFixed(2));
 
@@ -68,6 +73,8 @@ export const calculatePlatformFees = (amount: number): IPlatformFeeBreakdown => 
     nhilAmount,
     getFundLevyRate: TAX_RATES.GET_FUND_LEVY,
     getFundLevyAmount,
+    platformServiceFeeRate: TAX_RATES.PLATFORM,
+    platformServiceFeeAmount,
     platformCommissionRate: DEFAULT_PLATFORM_COMMISSION_PERCENTAGE,
     platformFee,
     artisanPayoutAmount,

@@ -39,6 +39,7 @@ export default {
   stripe: {
     secret_key: process.env.STRIPE_API_SECRET,
     webhook_secret: process.env.WEBHOOK_SECRET,
+    connect_country: process.env.STRIPE_CONNECT_COUNTRY || 'GH',
   },
 
   redis: {

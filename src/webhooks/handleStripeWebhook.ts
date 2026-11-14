@@ -8,6 +8,7 @@ import { handleInvoicePaymentSucceeded } from '../handlers/handleInvoicePaymentS
 import { handleInvoicePaymentFailed } from '../handlers/handleInvoicePaymentFailed';
 import handleSubscriptionDelete from '../handlers/handleSubscriptionDelete';
 import { handleSubscriptionUpdated } from '../handlers/handleSubscriptionUpdated';
+import { handleAccountUpdatedEvent } from '../handlers/handleAccountUpdatedEvent';
 
 export const handleStripeWebhook = async (req: Request, res: Response) => {
   try {
@@ -63,6 +64,10 @@ export const handleStripeWebhook = async (req: Request, res: Response) => {
       case 'customer.subscription.updated':
         const updatedSub = event.data.object as Stripe.Subscription;
         await handleSubscriptionUpdated(updatedSub);
+        break;
+
+      case 'account.updated':
+        await handleAccountUpdatedEvent(event.data.object as Stripe.Account);
         break;
 
       default:

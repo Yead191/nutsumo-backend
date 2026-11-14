@@ -289,7 +289,7 @@ export const bookingPayoutReleasedArtisanEmail = (
       Dear <strong>${values.artisanName}</strong>,
     </p>
     <p style="font-size: 15px; line-height: 1.6; color: #334155; margin: 0 0 24px 0;">
-      Your payout for Booking <strong>#${values.bookingNumber}</strong> has been <strong style="color: #059669;">RELEASED</strong>!
+      Your net earnings for Booking <strong>#${values.bookingNumber}</strong> are now in your <strong style="color: #059669;">Nutsumo balance</strong>. Withdraw them from Overview to your bank or mobile money.
     </p>
 
     <!-- Payout Breakdown Table -->
@@ -322,8 +322,16 @@ export const bookingPayoutReleasedArtisanEmail = (
           <td style="font-weight: 600; border-bottom: 1px solid #e2e8f0; padding-left: 20px;">GETFund Levy (2.5%):</td>
           <td style="color: #dc2626; border-bottom: 1px solid #e2e8f0;">-$${Number(values.getFundLevyAmount ?? ((values.totalAmount * 2.5) / 100)).toFixed(2)}</td>
         </tr>
+        ${
+          Number(values.platformServiceFeeAmount) > 0
+            ? `<tr>
+          <td style="font-weight: 600; border-bottom: 1px solid #e2e8f0; padding-left: 20px;">Platform fee (2.5%):</td>
+          <td style="color: #dc2626; border-bottom: 1px solid #e2e8f0;">-$${Number(values.platformServiceFeeAmount).toFixed(2)}</td>
+        </tr>`
+            : ''
+        }
         <tr>
-          <td style="font-weight: 600; border-bottom: 1px solid #e2e8f0; padding-left: 20px;">Total Deductions (20%):</td>
+          <td style="font-weight: 600; border-bottom: 1px solid #e2e8f0; padding-left: 20px;">Total deductions:</td>
           <td style="color: #dc2626; border-bottom: 1px solid #e2e8f0; font-weight: 600;">-$${Number(values.platformFee).toFixed(2)}</td>
         </tr>
         <tr>

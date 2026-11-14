@@ -82,6 +82,16 @@ const bookingSchema = new Schema<IBooking, BookingModel>(
       default: 0,
       min: 0,
     },
+    platformServiceFeeRate: {
+      type: Number,
+      default: TAX_RATES.PLATFORM,
+      min: 0,
+    },
+    platformServiceFeeAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     platformCommissionRate: {
       type: Number,
       default: DEFAULT_PLATFORM_COMMISSION_PERCENTAGE,

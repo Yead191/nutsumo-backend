@@ -585,6 +585,8 @@ const acceptQuotation = async (quotationId: string, customerId: string) => {
       nhilAmount: fees.nhilAmount,
       getFundLevyRate: fees.getFundLevyRate,
       getFundLevyAmount: fees.getFundLevyAmount,
+      platformServiceFeeRate: fees.platformServiceFeeRate,
+      platformServiceFeeAmount: fees.platformServiceFeeAmount,
       platformCommissionRate: fees.platformCommissionRate,
       platformFee: fees.platformFee,
       artisanPayoutAmount: fees.artisanPayoutAmount,

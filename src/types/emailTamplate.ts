@@ -438,6 +438,7 @@ export type IBookingPayoutReleasedArtisanEmail = {
   nhilAmount?: number;
   getFundLevyAmount?: number;
   platformFee: number;
+  platformServiceFeeAmount?: number;
   netPayoutAmount: number;
   payoutMethod?: string;
   payoutTransferId?: string;

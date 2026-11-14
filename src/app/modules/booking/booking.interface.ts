@@ -39,11 +39,13 @@ export interface IBooking {
   nhilAmount: number;         // e.g. 2.50
   getFundLevyRate: number;    // 2.5% (Ghana Education Trust Fund Levy)
   getFundLevyAmount: number;  // e.g. 2.50
+  platformServiceFeeRate: number;   // 2.5% Nutsumo platform fee
+  platformServiceFeeAmount: number;
 
-  // Total Platform commission and artisan payout
-  platformCommissionRate: number; // 20% (Total: VAT + NHIL + GETFund)
-  platformFee: number;            // e.g. 20.00 (Total statutory deductions)
-  artisanPayoutAmount: number;    // e.g. 80.00 (Net released to Artisan)
+  // Total withheld (statutory + platform fee) and artisan payout
+  platformCommissionRate: number; // 22.5%
+  platformFee: number;            // statutory + platform fee
+  artisanPayoutAmount: number;    // 77.5% net credited to the artisan balance
 
   status: BookingStatus;
   paymentStatus: BookingPaymentStatus;
