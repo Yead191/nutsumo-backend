@@ -59,6 +59,18 @@ const getArtisanProfileByUserId = catchAsync(
   },
 );
 
+const discoverArtisans = catchAsync(async (req: Request, res: Response) => {
+  const result = await ArtisanProfileServices.discoverArtisans(req.query);
+
+  return sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Matching artisans fetched successfully',
+    data: result.profiles,
+    pagination: result.pagination,
+  });
+});
+
 const getAllArtisanProfiles = catchAsync(
   async (req: Request, res: Response) => {
     const result = await ArtisanProfileServices.getAllArtisanProfiles(req.query);
@@ -107,6 +119,7 @@ export const ArtisanProfileController = {
   getMyArtisanProfile,
   getArtisanProfileById,
   getArtisanProfileByUserId,
+  discoverArtisans,
   getAllArtisanProfiles,
   updateArtisanProfileByAdmin,
   deleteArtisanProfile,

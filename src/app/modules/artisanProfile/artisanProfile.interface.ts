@@ -31,6 +31,7 @@ export interface IArtisanProfile {
   rating?: number;
   reviewsCount?: number;
   isProfilePublic?: boolean;
+  searchText?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }

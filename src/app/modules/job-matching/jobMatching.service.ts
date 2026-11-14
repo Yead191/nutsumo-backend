@@ -21,6 +21,30 @@ import { JobAlertServices } from '../jobAlert/jobAlert.service';
 
 const normalize = (value?: string | null) => value?.trim().toLowerCase() ?? '';
 
+const tidyPlace = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+/** "Dhaka" matches "Dhaka, Bangladesh". A shared country word does not match two cities. */
+const placesOverlap = (left: string, right: string) => {
+  const a = tidyPlace(left);
+  const b = tidyPlace(right);
+  if (!a || !b) return false;
+  return a === b || a.includes(b) || b.includes(a);
+};
+
+const postcodesOverlap = (left: string, right: string) => {
+  const a = left.replace(/\s+/g, '');
+  const b = right.replace(/\s+/g, '');
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const [shorter, longer] = a.length <= b.length ? [a, b] : [b, a];
+  return shorter.length >= 3 && longer.startsWith(shorter);
+};
+
 const getJobMatches = async (jobId: string): Promise<IJobMatch[]> => {
   if (!Types.ObjectId.isValid(jobId)) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid job ID');
@@ -124,7 +148,6 @@ const getJobMatches = async (jobId: string): Promise<IJobMatch[]> => {
       '_id artisan service category customName proposedCategory source rateAmount rateType',
     )
     .populate('service', 'name')
-    .limit(400)
     .lean();
 
   if (!artisanServices.length) {
@@ -167,15 +190,8 @@ const getJobMatches = async (jobId: string): Promise<IJobMatch[]> => {
     const artisanPostCode = normalize(profile.postCode);
     const artisanLocation = normalize(profile.location);
 
-    const postcodeMatches =
-      Boolean(jobPostCode) &&
-      Boolean(artisanPostCode) &&
-      jobPostCode === artisanPostCode;
-
-    const locationMatches =
-      Boolean(jobLocation) &&
-      Boolean(artisanLocation) &&
-      jobLocation === artisanLocation;
+    const postcodeMatches = postcodesOverlap(jobPostCode, artisanPostCode);
+    const locationMatches = placesOverlap(jobLocation, artisanLocation);
 
     const artisanLat =
       profile.serviceLatitude ?? profile.baseLocation?.coordinates?.[1];
@@ -325,23 +341,6 @@ const getJobMatches = async (jobId: string): Promise<IJobMatch[]> => {
     match.matchScore += boost;
     match.matchReason.push('SEARCH_RANK');
   }
-
-  void ElasticArtisanRank.indexArtisans(
-    ranked.slice(0, 50).map(match => {
-      const profile = profileMap.get(String(match.artisan));
-      return {
-        artisanId: String(match.artisan),
-        text: [profile?.trade, profile?.businessName, nameQueryText]
-          .filter(Boolean)
-          .join(' '),
-        acceptRate: profile?.acceptRate,
-        responseTimeMinutes: profile?.responseTimeMinutes,
-        rating: profile?.rating,
-        lat: profile?.serviceLatitude,
-        lng: profile?.serviceLongitude,
-      };
-    }),
-  );
 
   return ranked.sort((a, b) => b.matchScore - a.matchScore);
 };

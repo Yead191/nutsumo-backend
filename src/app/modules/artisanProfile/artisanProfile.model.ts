@@ -62,7 +62,7 @@ const artisanProfileSchema = new Schema<IArtisanProfile, ArtisanProfileModel>(
     },
     rating: {
       type: Number,
-      default: 5.0,
+      default: 0,
       min: 0,
       max: 5,
     },
@@ -74,6 +74,11 @@ const artisanProfileSchema = new Schema<IArtisanProfile, ArtisanProfileModel>(
     isProfilePublic: {
       type: Boolean,
       default: true,
+    },
+    searchText: {
+      type: String,
+      default: '',
+      select: false,
     },
     postCode: {
       index: true,
@@ -100,14 +105,28 @@ const artisanProfileSchema = new Schema<IArtisanProfile, ArtisanProfileModel>(
   },
 );
 
-// Search indexes for artisan discovery
-artisanProfileSchema.index({
-  businessName: 'text',
-  trade: 'text',
-  bio: 'text',
-  location: 'text',
-  postCode: 'text',
-});
+// One text index per collection. searchText holds trade, bio, and every live offering name.
+artisanProfileSchema.index(
+  {
+    searchText: 'text',
+    businessName: 'text',
+    trade: 'text',
+    bio: 'text',
+    location: 'text',
+    postCode: 'text',
+  },
+  {
+    name: 'artisan_discovery_text',
+    weights: {
+      searchText: 10,
+      trade: 6,
+      businessName: 5,
+      postCode: 4,
+      location: 2,
+      bio: 1,
+    },
+  },
+);
 artisanProfileSchema.index({ availabilityStatus: 1, rating: -1 });
 artisanProfileSchema.index({ baseLocation: '2dsphere' }, { sparse: true });
 

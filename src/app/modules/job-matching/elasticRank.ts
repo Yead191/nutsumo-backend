@@ -109,7 +109,38 @@ const textScores = async (query: string, artisanIds: string[]) => {
   return scores;
 };
 
+const searchPage = async (query: string, page: number, limit: number) => {
+  if (!query.trim() || !(await ensureIndex())) return null;
+
+  try {
+    const result = await esClient.search({
+      index: INDEX,
+      from: Math.max(0, (page - 1) * limit),
+      size: limit,
+      timeout: '400ms',
+      query: {
+        multi_match: {
+          query,
+          fields: ['text'],
+        },
+      },
+    });
+
+    const ids = result.hits.hits
+      .map(hit => (hit._source as { artisanId?: string } | undefined)?.artisanId)
+      .filter((id): id is string => Boolean(id));
+    const rawTotal = result.hits.total;
+    const total = typeof rawTotal === 'number' ? rawTotal : rawTotal?.value || ids.length;
+
+    return { ids, total };
+  } catch (error: any) {
+    logger.warn(`[Elasticsearch] Discover skipped: ${error?.message || error}`);
+    return null;
+  }
+};
+
 export const ElasticArtisanRank = {
   indexArtisans,
   textScores,
+  searchPage,
 };

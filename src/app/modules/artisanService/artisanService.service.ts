@@ -9,6 +9,10 @@ import { User } from '../user/user.model';
 import { USER_ROLES } from '../../../enums/user';
 import { generateSlug } from '../category/category.service';
 import { normalizeServiceName } from './serviceMatch';
+import { rebuildArtisanSearchText } from '../artisanProfile/artisanSearch.sync';
+
+const refreshArtisanSearch = (artisanId: unknown) =>
+  rebuildArtisanSearchText(String(artisanId || ''));
 
 const populateOffering = (id: mongoose.Types.ObjectId | string) =>
   ArtisanService.findById(id)
@@ -132,6 +136,7 @@ const createCatalogSelection = async (
   if (!populated) {
     throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, 'Failed to save service');
   }
+  await refreshArtisanSearch(artisanId);
   return populated;
 };
 
@@ -235,6 +240,7 @@ const createCustomService = async (
   if (!populated) {
     throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, 'Failed to save service');
   }
+  await refreshArtisanSearch(artisanId);
   return populated;
 };
 
@@ -497,6 +503,7 @@ const updateArtisanService = async (
     }
   }
 
+  if (result) await refreshArtisanSearch(result.artisan);
   return result;
 };
 
@@ -530,6 +537,7 @@ const deleteArtisanService = async (
   }
 
   const result = await ArtisanService.findByIdAndDelete(id);
+  await refreshArtisanSearch(artisanService.artisan);
   return result;
 };
 
@@ -557,6 +565,7 @@ const reviewArtisanService = async (
     offering.isActive = false;
     offering.rejectionReason = payload.reason?.trim() || '';
     await offering.save();
+    await refreshArtisanSearch(offering.artisan);
     return populateOffering(offering._id);
   }
 
@@ -623,6 +632,7 @@ const reviewArtisanService = async (
   });
   if (alreadyLinked) {
     await ArtisanService.findByIdAndDelete(offering._id);
+    await refreshArtisanSearch(offering.artisan);
     return populateOffering(alreadyLinked._id);
   }
 
@@ -633,6 +643,7 @@ const reviewArtisanService = async (
   offering.customName = catalogService.name;
   offering.normalizedName = normalizeServiceName(catalogService.name);
   await offering.save();
+  await refreshArtisanSearch(offering.artisan);
 
   return populateOffering(offering._id);
 };

@@ -19,6 +19,8 @@ router
     ArtisanProfileController.upsertMyArtisanProfile,
   );
 
+router.get('/discover', ArtisanProfileController.discoverArtisans);
+
 router
   .route('/user/:userId')
   .get(ArtisanProfileController.getArtisanProfileByUserId);

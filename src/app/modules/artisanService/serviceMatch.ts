@@ -54,11 +54,12 @@ export const nameMatchScore = (
   const rightSet = new Set(rightTokens);
   const hits = leftTokens.filter(token => rightSet.has(token)).length;
   const overlap = hits / Math.max(leftTokens.length, rightTokens.length);
+  const shorterCoverage = hits / Math.min(leftTokens.length, rightTokens.length);
   const contained =
     normalizedLeft.includes(normalizedRight) ||
     normalizedRight.includes(normalizedLeft);
 
-  return contained ? Math.max(overlap, 0.85) : overlap;
+  return contained ? Math.max(overlap, shorterCoverage, 0.85) : Math.max(overlap, shorterCoverage);
 };
 
 export const tokenRegex = (value?: string | null) => {

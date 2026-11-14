@@ -50,7 +50,7 @@ export const recalculateArtisanRating = async (
     } else {
       await ArtisanProfile.findOneAndUpdate(
         { user: objectId },
-        { rating: 5.0, reviewsCount: 0 },
+        { rating: 0, reviewsCount: 0 },
       );
     }
   } catch (err: any) {
