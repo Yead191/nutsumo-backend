@@ -21,17 +21,29 @@ services:
     networks:
       - template-network
 
-  redis:
-    image: redis
+  # redis:
+  #   image: redis
+  #   ports:
+  #     - 6379:6379
+  #   volumes:
+  #     - redisdata:/data
+  #   networks:
+  #     - template-network
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.0
     ports:
-      - 6379:6379
+      - 9200:9200
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
     volumes:
-      - redisdata:/data
+      - esdata:/usr/share/elasticsearch/data
     networks:
       - template-network
 
 volumes:
   redisdata:
+  esdata:
 
 networks:
   template-network:

@@ -265,6 +265,169 @@ const offeringLabel = (item: {
   return '';
 };
 
+const userIdOf = (profile: { user?: any }) => {
+  const user = profile.user;
+  if (user && typeof user === 'object' && '_id' in user) return String(user._id || '');
+  return String(user || '');
+};
+
+const presentProfile = (
+  profile: Record<string, any>,
+  tokens: string[],
+): Record<string, any> => {
+  const list = Array.isArray(profile.offerings) ? profile.offerings : [];
+  const scoreOf = (item: (typeof list)[number]) => {
+    const label = offeringLabel(item).toLowerCase();
+    return tokens.reduce((sum, token) => sum + (label.includes(token) ? 1 : 0), 0);
+  };
+  const ranked = [...list].sort((left, right) => scoreOf(right) - scoreOf(left));
+  const best = ranked[0] && scoreOf(ranked[0]) > 0 ? ranked[0] : undefined;
+  const cheapest = [...list]
+    .filter(item => Number(item.rateAmount) > 0)
+    .sort((left, right) => left.rateAmount - right.rateAmount)[0];
+  const offerOf = (item: (typeof list)[number]) => ({
+    name: offeringLabel(item),
+    rateAmount: item.rateAmount,
+    rateType: item.rateType,
+  });
+  const {
+    offerings: _offerings,
+    userDoc: _userDoc,
+    searchText: _searchText,
+    ...rest
+  } = profile;
+  return {
+    ...rest,
+    matchedOffering: best ? offerOf(best) : null,
+    startingOffer: cheapest ? offerOf(cheapest) : null,
+  };
+};
+
+const castMatch = (match: Record<string, unknown>) => {
+  const next = { ...match };
+  const user = next.user as { $in?: unknown[] } | undefined;
+  if (user?.$in) {
+    next.user = {
+      $in: user.$in.map(id =>
+        id instanceof mongoose.Types.ObjectId
+          ? id
+          : new mongoose.Types.ObjectId(String(id)),
+      ),
+    };
+  }
+  return next;
+};
+
+const joinStages = (): mongoose.PipelineStage[] => [
+  {
+    $lookup: {
+      from: ArtisanService.collection.name,
+      let: { artisanId: '$user' },
+      pipeline: [
+        {
+          $match: {
+            $expr: {
+              $and: [
+                { $eq: ['$artisan', '$$artisanId'] },
+                { $eq: ['$isActive', true] },
+                { $ne: ['$reviewStatus', 'REJECTED'] },
+              ],
+            },
+          },
+        },
+        {
+          $lookup: {
+            from: Service.collection.name,
+            localField: 'service',
+            foreignField: '_id',
+            as: 'service',
+            pipeline: [{ $project: { name: 1 } }],
+          },
+        },
+        { $unwind: { path: '$service', preserveNullAndEmptyArrays: true } },
+        { $project: { customName: 1, service: 1, rateAmount: 1, rateType: 1 } },
+      ],
+      as: 'offerings',
+    },
+  },
+  {
+    $lookup: {
+      from: User.collection.name,
+      localField: 'user',
+      foreignField: '_id',
+      as: 'userDoc',
+      pipeline: [
+        {
+          $project: {
+            name: 1,
+            email: 1,
+            phone: 1,
+            image: 1,
+            location: 1,
+            trade: 1,
+            identityStatus: 1,
+            verified: 1,
+            status: 1,
+          },
+        },
+      ],
+    },
+  },
+  {
+    $addFields: {
+      user: { $ifNull: [{ $arrayElemAt: ['$userDoc', 0] }, null] },
+    },
+  },
+  { $unset: ['userDoc', 'searchText'] },
+];
+
+const loadDiscoverPage = async (
+  match: Record<string, unknown>,
+  options: {
+    page: number;
+    limit: number;
+    sortKey: string;
+    tokens: string[];
+    useText: boolean;
+    paginate: boolean;
+  },
+) => {
+  const sort: Record<string, 1 | -1> = options.useText
+    ? { score: -1, ...plainSort(options.sortKey) }
+    : plainSort(options.sortKey);
+  const pipeline: mongoose.PipelineStage[] = [{ $match: castMatch(match) }];
+  if (options.useText) {
+    pipeline.push({ $addFields: { score: { $meta: 'textScore' } } });
+  }
+
+  const rows: mongoose.PipelineStage.FacetPipelineStage[] = [];
+  if (options.paginate) {
+    rows.push(
+      { $sort: sort },
+      { $skip: (options.page - 1) * options.limit },
+      { $limit: options.limit },
+    );
+  }
+  rows.push(...(joinStages() as mongoose.PipelineStage.FacetPipelineStage[]));
+
+  pipeline.push({
+    $facet: {
+      rows,
+      meta: [{ $count: 'total' }],
+    },
+  });
+
+  const [aggregated] = await ArtisanProfile.aggregate<{
+    rows: Array<Record<string, any>>;
+    meta: Array<{ total: number }>;
+  }>(pipeline);
+
+  return {
+    profiles: (aggregated?.rows || []).map(row => presentProfile(row, options.tokens)),
+    total: aggregated?.meta?.[0]?.total || 0,
+  };
+};
+
 const discoverArtisans = async (query: Record<string, unknown>) => {
   await ensureArtisanDiscovery();
 
@@ -289,63 +452,56 @@ const discoverArtisans = async (query: Record<string, unknown>) => {
   if (minRating > 0) {
     filter.rating = { $gte: minRating };
   }
-  if (place) {
-    const placeRegex = new RegExp(escapeRegex(place), 'i');
+  const placeRegex = place ? new RegExp(escapeRegex(place), 'i') : null;
+  if (placeRegex) {
     filter.$and = [{ $or: [{ location: placeRegex }, { postCode: placeRegex }] }];
   }
 
   const categoryId = String(query.category || '').trim();
   if (categoryId && mongoose.Types.ObjectId.isValid(categoryId)) {
-    const catalogServices = await Service.find({
+    const serviceIds = await Service.find({
       category: categoryId,
       isActive: true,
-    })
-      .select('_id')
-      .lean();
-    const rows = await ArtisanService.find({
+    }).distinct('_id');
+    const artisanIds = await ArtisanService.distinct('artisan', {
       isActive: true,
       reviewStatus: { $ne: 'REJECTED' },
       $or: [
         { category: categoryId },
-        ...(catalogServices.length
-          ? [{ service: { $in: catalogServices.map(item => item._id) } }]
-          : []),
+        ...(serviceIds.length ? [{ service: { $in: serviceIds } }] : []),
       ],
-    })
-      .select('artisan')
-      .lean();
-    const ids = [...new Set(rows.map(row => String(row.artisan)))];
-    if (!ids.length) {
+    });
+    if (!artisanIds.length) {
       return {
         profiles: [],
         pagination: { total: 0, limit, page, totalPage: 0 },
       };
     }
-    filter.user = { $in: ids };
+    filter.user = { $in: artisanIds };
   }
 
-  const run = async (useText: boolean) => {
-    const nextFilter = { ...filter };
-    if (useText && tokens.length) {
-      nextFilter.$text = { $search: tokens.map(token => `"${token}"`).join(' ') };
-    } else if (tokens.length) {
-      nextFilter.searchText = new RegExp(tokens.map(escapeRegex).join('|'), 'i');
+  const pageOptions = {
+    page,
+    limit,
+    sortKey,
+    tokens,
+  };
+  const cardMatches = (card: Record<string, any>) => {
+    if (card.isProfilePublic === false) return false;
+    if (availability && availability !== 'all' && card.availabilityStatus !== availability) {
+      return false;
     }
-
-    const ranking: Record<string, 1 | -1 | { $meta: 'textScore' }> = useText
-      ? { score: { $meta: 'textScore' }, ...plainSort(sortKey) }
-      : plainSort(sortKey);
-    const [profiles, total] = await Promise.all([
-      ArtisanProfile.find(nextFilter, useText ? { score: { $meta: 'textScore' } } : undefined)
-        .populate('user', USER_POPULATE_FIELDS)
-        .sort(ranking)
-        .skip((page - 1) * limit)
-        .limit(limit)
-        .lean(),
-      ArtisanProfile.countDocuments(nextFilter),
-    ]);
-
-    return { profiles, total };
+    if (minRating > 0 && !(Number(card.rating) >= minRating)) return false;
+    if (
+      placeRegex &&
+      !placeRegex.test(String(card.location || '')) &&
+      !placeRegex.test(String(card.postCode || ''))
+    ) {
+      return false;
+    }
+    const allowed = (filter.user as { $in?: unknown[] } | undefined)?.$in;
+    if (allowed && !allowed.map(id => String(id)).includes(userIdOf(card))) return false;
+    return true;
   };
 
   let usedText = false;
@@ -354,98 +510,64 @@ const discoverArtisans = async (query: Record<string, unknown>) => {
     ? await ElasticArtisanRank.searchPage(tokens.join(' '), page, limit)
     : null;
 
-  if (elastic?.ids.length) {
+  if (elastic?.cards.length && elastic.cards.length === elastic.ids.length) {
+    const profiles = elastic.cards
+      .filter(card => cardMatches(card as Record<string, any>))
+      .map(card => presentProfile(card as Record<string, any>, tokens));
+    if (profiles.length) {
+      result = { profiles, total: elastic.total };
+      usedText = true;
+    }
+  } else if (elastic?.ids.length) {
     const categoryIds = Array.isArray((filter.user as { $in?: unknown[] } | undefined)?.$in)
       ? new Set((filter.user as { $in: unknown[] }).$in.map(id => String(id)))
       : null;
     const ids = elastic.ids.filter(id => !categoryIds || categoryIds.has(id));
-    const found = ids.length
-      ? await ArtisanProfile.find({ ...filter, user: { $in: ids } })
-          .populate('user', USER_POPULATE_FIELDS)
-          .lean()
-      : [];
-    if (found.length) {
-      const order = new Map(ids.map((id, index) => [id, index]));
-      const idOf = (profile: { user?: { _id?: unknown } | unknown }) => {
-        const user = profile.user;
-        if (user && typeof user === 'object' && '_id' in user) return String(user._id);
-        return String(user || '');
-      };
-      found.sort(
-        (left, right) => (order.get(idOf(left)) ?? 99) - (order.get(idOf(right)) ?? 99),
+    if (ids.length) {
+      const loaded = await loadDiscoverPage(
+        { ...filter, user: { $in: ids } },
+        { ...pageOptions, useText: false, paginate: false },
       );
-      result = { profiles: found, total: elastic.total };
-      usedText = true;
+      if (loaded.profiles.length) {
+        const order = new Map(ids.map((id, index) => [id, index]));
+        loaded.profiles.sort(
+          (left, right) =>
+            (order.get(userIdOf(left)) ?? 99) - (order.get(userIdOf(right)) ?? 99),
+        );
+        result = { profiles: loaded.profiles, total: elastic.total };
+        usedText = true;
+      }
     }
   }
 
   if (!usedText && tokens.length) {
     try {
-      result = await run(true);
+      result = await loadDiscoverPage(
+        {
+          ...filter,
+          $text: { $search: tokens.map(token => `"${token}"`).join(' ') },
+        },
+        { ...pageOptions, useText: true, paginate: true },
+      );
       usedText = true;
     } catch {
       usedText = false;
     }
   }
   if (!usedText || (tokens.length > 0 && result.total === 0)) {
-    result = await run(false);
-  }
-
-  const artisanIds = result.profiles
-    .map(profile => {
-      const user = profile.user as { _id?: mongoose.Types.ObjectId } | mongoose.Types.ObjectId;
-      if (user && typeof user === 'object' && '_id' in user) return user._id;
-      return profile.user as mongoose.Types.ObjectId;
-    })
-    .filter(Boolean);
-
-  const offerings = artisanIds.length
-    ? await ArtisanService.find({
-        artisan: { $in: artisanIds },
-        isActive: true,
-        reviewStatus: { $ne: 'REJECTED' },
-      })
-        .populate('service', 'name')
-        .select('artisan customName service rateAmount rateType')
-        .lean()
-    : [];
-
-  const byArtisan = new Map<string, typeof offerings>();
-  for (const offering of offerings) {
-    const key = String(offering.artisan);
-    const list = byArtisan.get(key) || [];
-    list.push(offering);
-    byArtisan.set(key, list);
-  }
-
-  const profiles = result.profiles.map(profile => {
-    const user = profile.user as { _id?: mongoose.Types.ObjectId } | mongoose.Types.ObjectId;
-    const userId =
-      user && typeof user === 'object' && '_id' in user ? String(user._id) : String(user);
-    const list = byArtisan.get(userId) || [];
-    const scoreOf = (item: (typeof list)[number]) => {
-      const label = offeringLabel(item).toLowerCase();
-      return tokens.reduce((sum, token) => sum + (label.includes(token) ? 1 : 0), 0);
-    };
-    const ranked = [...list].sort((left, right) => scoreOf(right) - scoreOf(left));
-    const best = ranked[0] && scoreOf(ranked[0]) > 0 ? ranked[0] : undefined;
-    const cheapest = [...list]
-      .filter(item => Number(item.rateAmount) > 0)
-      .sort((left, right) => left.rateAmount - right.rateAmount)[0];
-    const offerOf = (item: (typeof list)[number]) => ({
-      name: offeringLabel(item),
-      rateAmount: item.rateAmount,
-      rateType: item.rateType,
+    const nextFilter = { ...filter };
+    if (tokens.length) {
+      nextFilter.searchText = new RegExp(tokens.map(escapeRegex).join('|'), 'i');
+    }
+    result = await loadDiscoverPage(nextFilter, {
+      ...pageOptions,
+      useText: false,
+      paginate: true,
     });
-    return {
-      ...profile,
-      matchedOffering: best ? offerOf(best) : null,
-      startingOffer: cheapest ? offerOf(cheapest) : null,
-    };
-  });
+  }
 
   return {
-    profiles,
+    profiles: result.profiles,
     pagination: {
       total: result.total,
       limit,

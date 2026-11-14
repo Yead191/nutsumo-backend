@@ -1,8 +1,6 @@
-import config from '../../../config';
-import { esClient } from '../../../config/elastic-search';
-import { logger } from '../../../shared/logger';
+import { elasticHelper } from '../../../tools/elastic-search/elastic-search';
 
-const INDEX = 'nutsumo-artisans';
+export const ARTISAN_INDEX = 'nutsumo-artisans';
 
 export interface ArtisanSearchDoc {
   artisanId: string;
@@ -12,131 +10,110 @@ export interface ArtisanSearchDoc {
   rating?: number;
   lat?: number;
   lng?: number;
+  isProfilePublic?: boolean;
+  availabilityStatus?: string;
+  postCode?: string;
+  locationText?: string;
+  categoryIds?: string[];
+  card?: Record<string, unknown>;
 }
 
-let indexReady: Promise<boolean> | null = null;
-
-const ensureIndex = () => {
-  if (!config.elasticSearch?.url) return Promise.resolve(false);
-  if (!indexReady) {
-    indexReady = (async () => {
-      const exists = await esClient.indices.exists({ index: INDEX });
-      if (!exists) {
-        await esClient.indices.create({
-          index: INDEX,
-          mappings: {
-            properties: {
-              artisanId: { type: 'keyword' },
-              text: { type: 'text' },
-              acceptRate: { type: 'float' },
-              responseTimeMinutes: { type: 'float' },
-              rating: { type: 'float' },
-              location: { type: 'geo_point' },
-            },
-          },
-        });
-      }
-      return true;
-    })().catch(error => {
-      indexReady = null;
-      logger.warn(`[Elasticsearch] Index unavailable: ${error?.message || error}`);
-      return false;
-    });
-  }
-  return indexReady;
+const MAPPINGS = {
+  properties: {
+    artisanId: { type: 'keyword' },
+    text: { type: 'text' },
+    acceptRate: { type: 'float' },
+    responseTimeMinutes: { type: 'float' },
+    rating: { type: 'float' },
+    location: { type: 'geo_point' },
+    isProfilePublic: { type: 'boolean' },
+    availabilityStatus: { type: 'keyword' },
+    postCode: { type: 'keyword' },
+    locationText: { type: 'text' },
+    categoryIds: { type: 'keyword' },
+    card: { type: 'object', enabled: false },
+  },
 };
 
+const documentOf = (doc: ArtisanSearchDoc) => ({
+  artisanId: doc.artisanId,
+  text: doc.text,
+  acceptRate: doc.acceptRate ?? 0,
+  responseTimeMinutes: doc.responseTimeMinutes ?? 0,
+  rating: doc.rating ?? 0,
+  isProfilePublic: doc.isProfilePublic !== false,
+  availabilityStatus: doc.availabilityStatus || '',
+  postCode: doc.postCode || '',
+  locationText: doc.locationText || '',
+  categoryIds: doc.categoryIds || [],
+  ...(doc.card ? { card: doc.card } : {}),
+  ...(doc.lat != null && doc.lng != null
+    ? { location: { lat: doc.lat, lon: doc.lng } }
+    : {}),
+});
+
+const fuzzyTextQuery = (query: string) => ({
+  multi_match: {
+    query,
+    fields: ['text^3', 'locationText'],
+    fuzziness: 'AUTO',
+    prefix_length: 0,
+    fuzzy_transpositions: true,
+  },
+});
+
 const indexArtisans = async (docs: ArtisanSearchDoc[]) => {
-  if (!docs.length || !(await ensureIndex())) return;
-  try {
-    await esClient.bulk({
-      refresh: false,
-      operations: docs.flatMap(doc => [
-        { index: { _index: INDEX, _id: doc.artisanId } },
-        {
-          artisanId: doc.artisanId,
-          text: doc.text,
-          acceptRate: doc.acceptRate ?? 0,
-          responseTimeMinutes: doc.responseTimeMinutes ?? 0,
-          rating: doc.rating ?? 0,
-          ...(doc.lat != null && doc.lng != null
-            ? { location: { lat: doc.lat, lon: doc.lng } }
-            : {}),
-        },
-      ]),
-    });
-  } catch (error: any) {
-    logger.warn(`[Elasticsearch] Index write skipped: ${error?.message || error}`);
-  }
+  if (!docs.length) return;
+  await elasticHelper.bulkIndex(
+    ARTISAN_INDEX,
+    docs.map(doc => ({ id: doc.artisanId, document: documentOf(doc) })),
+    MAPPINGS,
+  );
 };
 
 const textScores = async (query: string, artisanIds: string[]) => {
   const scores = new Map<string, number>();
-  if (!query.trim() || !artisanIds.length || !(await ensureIndex())) {
-    return scores;
-  }
+  if (!query.trim() || !artisanIds.length) return scores;
 
-  try {
-    const result = await esClient.search({
-      index: INDEX,
-      size: Math.min(artisanIds.length, 50),
-      timeout: '400ms',
-      query: {
-        bool: {
-          must: [
-            {
-              multi_match: {
-                query,
-                fields: ['text'],
-              },
-            },
-          ],
-          filter: [{ terms: { artisanId: artisanIds } }],
-        },
+  const found = await elasticHelper.searchDocuments<{ artisanId?: string }>(
+    ARTISAN_INDEX,
+    {
+      bool: {
+        must: [fuzzyTextQuery(query)],
+        filter: [{ terms: { artisanId: artisanIds.slice(0, 50) } }],
       },
-    });
+    },
+    { page: 1, limit: Math.min(artisanIds.length, 50), mappings: MAPPINGS },
+  );
+  if (!found?.hits.length) return scores;
 
-    const max = result.hits.hits[0]?._score || 1;
-    for (const hit of result.hits.hits) {
-      const id = (hit._source as { artisanId?: string } | undefined)?.artisanId;
-      if (!id || hit._score == null) continue;
-      scores.set(id, Math.round((hit._score / max) * 15));
-    }
-  } catch (error: any) {
-    logger.warn(`[Elasticsearch] Search skipped: ${error?.message || error}`);
+  const max = found.hits[0]?.score || 1;
+  for (const hit of found.hits) {
+    const id = hit.source.artisanId || hit.id;
+    if (!id || hit.score == null) continue;
+    scores.set(id, Math.round((hit.score / max) * 15));
   }
-
   return scores;
 };
 
 const searchPage = async (query: string, page: number, limit: number) => {
-  if (!query.trim() || !(await ensureIndex())) return null;
+  if (!query.trim()) return null;
 
-  try {
-    const result = await esClient.search({
-      index: INDEX,
-      from: Math.max(0, (page - 1) * limit),
-      size: limit,
-      timeout: '400ms',
-      query: {
-        multi_match: {
-          query,
-          fields: ['text'],
-        },
-      },
-    });
+  const found = await elasticHelper.searchDocuments<ArtisanSearchDoc>(
+    ARTISAN_INDEX,
+    fuzzyTextQuery(query),
+    { page, limit, mappings: MAPPINGS },
+  );
+  if (!found) return null;
 
-    const ids = result.hits.hits
-      .map(hit => (hit._source as { artisanId?: string } | undefined)?.artisanId)
-      .filter((id): id is string => Boolean(id));
-    const rawTotal = result.hits.total;
-    const total = typeof rawTotal === 'number' ? rawTotal : rawTotal?.value || ids.length;
+  const ids = found.hits
+    .map(hit => hit.source.artisanId || hit.id)
+    .filter((id): id is string => Boolean(id));
+  const cards = found.hits
+    .map(hit => hit.source.card)
+    .filter((card): card is Record<string, unknown> => Boolean(card));
 
-    return { ids, total };
-  } catch (error: any) {
-    logger.warn(`[Elasticsearch] Discover skipped: ${error?.message || error}`);
-    return null;
-  }
+  return { ids, total: found.total, cards };
 };
 
 export const ElasticArtisanRank = {
