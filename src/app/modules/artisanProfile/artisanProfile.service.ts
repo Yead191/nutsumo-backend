@@ -28,6 +28,9 @@ const upsertMyArtisanProfile = async (
     'bio',
     'location',
     'postCode',
+    'serviceLatitude',
+    'serviceLongitude',
+    'serviceRadiusKm',
     'experienceYears',
     'availabilityStatus',
     'hourlyRate',
@@ -41,6 +44,16 @@ const upsertMyArtisanProfile = async (
     if ((payload as any)[field] !== undefined) {
       updateData[field] = (payload as any)[field];
     }
+  }
+
+  if (
+    typeof updateData.serviceLatitude === 'number' &&
+    typeof updateData.serviceLongitude === 'number'
+  ) {
+    updateData.baseLocation = {
+      type: 'Point',
+      coordinates: [updateData.serviceLongitude, updateData.serviceLatitude],
+    };
   }
 
   // Upsert profile

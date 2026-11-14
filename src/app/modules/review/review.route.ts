@@ -7,6 +7,13 @@ import { USER_ROLES } from '../../../enums/user';
 
 const router = express.Router();
 
+router
+  .route('/admin/all')
+  .get(
+    auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN),
+    ReviewController.getAllReviewsAdmin,
+  );
+
 // 1. Submit a Review (Customer only)
 router
   .route('/')

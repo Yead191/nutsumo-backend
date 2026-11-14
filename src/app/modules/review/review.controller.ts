@@ -100,6 +100,18 @@ const updateReview = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const getAllReviewsAdmin = catchAsync(async (req: Request, res: Response) => {
+  const result = await ReviewServices.getAllReviewsAdmin(req.query);
+
+  return sendResponse(res, {
+    statusCode: StatusCodes.OK,
+    success: true,
+    message: 'Reviews retrieved successfully',
+    data: result.reviews,
+    pagination: result.pagination,
+  });
+});
+
 export const ReviewController = {
   createReview,
   getArtisanReviews,
@@ -107,4 +119,5 @@ export const ReviewController = {
   replyToReview,
   getMyReviews,
   updateReview,
+  getAllReviewsAdmin,
 };

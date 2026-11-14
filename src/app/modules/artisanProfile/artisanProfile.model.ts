@@ -80,6 +80,18 @@ const artisanProfileSchema = new Schema<IArtisanProfile, ArtisanProfileModel>(
       type: String,
       trim: true,
     },
+    serviceLatitude: { type: Number },
+    serviceLongitude: { type: Number },
+    serviceRadiusKm: { type: Number, min: 1, max: 150, default: 25 },
+    baseLocation: {
+      type: { type: String, enum: ['Point'] },
+      coordinates: { type: [Number] },
+    },
+    quotesSent: { type: Number, default: 0, min: 0 },
+    quotesAccepted: { type: Number, default: 0, min: 0 },
+    acceptRate: { type: Number, default: 0, min: 0, max: 1 },
+    responseTimeMinutes: { type: Number, min: 0 },
+    responseSamples: { type: Number, default: 0, min: 0 },
   },
   {
     timestamps: true,
@@ -97,6 +109,7 @@ artisanProfileSchema.index({
   postCode: 'text',
 });
 artisanProfileSchema.index({ availabilityStatus: 1, rating: -1 });
+artisanProfileSchema.index({ baseLocation: '2dsphere' }, { sparse: true });
 
 export const ArtisanProfile = model<IArtisanProfile, ArtisanProfileModel>(
   'ArtisanProfile',

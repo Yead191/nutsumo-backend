@@ -73,6 +73,10 @@ const createJob = async (customerId: string, payload: Partial<IJob>) => {
         : null,
       images: payload.images ?? [],
       postCode: payload.postCode ?? '',
+      latitude:
+        typeof payload.latitude === 'number' ? payload.latitude : undefined,
+      longitude:
+        typeof payload.longitude === 'number' ? payload.longitude : undefined,
     };
 
     const job = await Job.create(jobData);

@@ -649,7 +649,7 @@ const approveBookingPayout = async (
     title: 'Payout Approved! 🛡️',
     message: `Admin approved your payout of $${Number(booking.artisanPayoutAmount).toFixed(2)} for Booking #${booking.bookingNumber}. Release will occur shortly.`,
     refId: booking._id,
-    path: `/artisan/bookings/${booking._id}`,
+    path: `/pro/jobs/${booking.job}`,
     seen: false,
   });
 
@@ -924,7 +924,7 @@ const getAllBookingsAdmin = async (query: Record<string, any>) => {
     query,
   )
     .search(BOOKING_SEARCHABLE_FIELDS)
-    .filter(['status', 'paymentStatus', 'payoutStatus'])
+    .filter()
     .fields()
     .sort()
     .paginate();

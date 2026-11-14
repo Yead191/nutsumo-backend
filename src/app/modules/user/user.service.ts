@@ -95,6 +95,13 @@ const getUserProfileFromDB = async (
       userObj.availabilityStatus = ap.availabilityStatus;
     if (ap.postCode !== undefined)
       userObj.postCode = ap.postCode;
+    if (ap.serviceRadiusKm !== undefined) userObj.serviceRadiusKm = ap.serviceRadiusKm;
+    if (ap.serviceLatitude !== undefined) userObj.serviceLatitude = ap.serviceLatitude;
+    if (ap.serviceLongitude !== undefined) userObj.serviceLongitude = ap.serviceLongitude;
+    if (ap.acceptRate !== undefined) userObj.acceptRate = ap.acceptRate;
+    if (ap.responseTimeMinutes !== undefined)
+      userObj.responseTimeMinutes = ap.responseTimeMinutes;
+    if (ap.responseSamples !== undefined) userObj.responseSamples = ap.responseSamples;
   }
 
   return userObj;
@@ -138,6 +145,21 @@ const updateProfileToDB = async (
     artisanFields.availabilityStatus = payload.availabilityStatus;
   if (payload.postCode !== undefined)
     artisanFields.postCode = payload.postCode;
+  if (payload.serviceLatitude !== undefined)
+    artisanFields.serviceLatitude = payload.serviceLatitude;
+  if (payload.serviceLongitude !== undefined)
+    artisanFields.serviceLongitude = payload.serviceLongitude;
+  if (payload.serviceRadiusKm !== undefined)
+    artisanFields.serviceRadiusKm = payload.serviceRadiusKm;
+  if (
+    typeof payload.serviceLatitude === 'number' &&
+    typeof payload.serviceLongitude === 'number'
+  ) {
+    artisanFields.baseLocation = {
+      type: 'Point',
+      coordinates: [payload.serviceLongitude, payload.serviceLatitude],
+    };
+  }
 
   if (
     Object.keys(artisanFields).length > 0 ||
@@ -175,6 +197,9 @@ const updateProfileToDB = async (
     if (ap.experienceYears !== undefined) resultObj.experienceYears = ap.experienceYears;
     if (ap.availabilityStatus) resultObj.availabilityStatus = ap.availabilityStatus;
     if (ap.postCode !== undefined) resultObj.postCode = ap.postCode;
+    if (ap.serviceRadiusKm !== undefined) resultObj.serviceRadiusKm = ap.serviceRadiusKm;
+    if (ap.serviceLatitude !== undefined) resultObj.serviceLatitude = ap.serviceLatitude;
+    if (ap.serviceLongitude !== undefined) resultObj.serviceLongitude = ap.serviceLongitude;
   }
 
   return resultObj;

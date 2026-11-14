@@ -23,6 +23,7 @@ import { kafkaProducer } from '../../../tools/kafka/kafka-producers/kafka.produc
 import { logger } from '../../../shared/logger';
 import stripe from '../../../config/stripe';
 import config from '../../../config';
+import { ArtisanReliability } from '../artisanReliability/artisanReliability.service';
 
 // Helper to generate human-readable unique booking number
 const generateBookingNumber = () => {
@@ -141,6 +142,17 @@ const submitQuotation = async (
       estimatedDuration: payload.estimatedDuration || '',
       status: QUOTATION_STATUSES.PENDING,
     });
+
+    try {
+      await ArtisanReliability.recordQuoteResponse(
+        artisanId,
+        job.createdAt,
+      );
+    } catch (error: any) {
+      logger.warn(
+        `[Reliability] Quote response was not recorded: ${error?.message || error}`,
+      );
+    }
   }
 
   if (!quotationDoc) {
@@ -593,6 +605,14 @@ const acceptQuotation = async (quotationId: string, customerId: string) => {
       session.endSession();
     }
 
+    try {
+      await ArtisanReliability.recordQuoteAccepted(String(quotation.artisan));
+    } catch (error: any) {
+      logger.warn(
+        `[Reliability] Accept rate was not recorded: ${error?.message || error}`,
+      );
+    }
+
     // 7. Generate Stripe Checkout Session for Immediate Escrow Payment
     let checkoutUrl: string | null = null;
     try {
@@ -674,7 +694,7 @@ const acceptQuotation = async (quotationId: string, customerId: string) => {
       title: 'Quotation Accepted! 🎉',
       message: `Great news! Your quotation for "${job.title}" has been accepted. Booking #${bookingNumber} is created (awaiting customer escrow payment).`,
       refId: bookingDoc._id as Types.ObjectId,
-      path: `/pro/jobs/${bookingDoc._id}`,
+      path: `/pro/jobs/${bookingDoc.job}`,
       seen: false,
     });
 

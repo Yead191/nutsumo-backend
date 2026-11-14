@@ -27,6 +27,7 @@ import { JobRoutes } from '../app/modules/job/job.route';
 import { QuotationRoutes } from '../app/modules/quotation/quotation.route';
 import { BookingRoutes } from '../app/modules/booking/booking.route';
 import { ReviewRoutes } from '../app/modules/review/review.route';
+import { JobAlertRoutes } from '../app/modules/jobAlert/jobAlert.route';
 const router = express.Router();
 
 const apiRoutes = [
@@ -202,6 +203,10 @@ const apiRoutes = [
   {
     path: '/bookings',
     route: BookingRoutes,
+  },
+  {
+    path: '/job-alert',
+    route: JobAlertRoutes,
   },
   {
     path: '/review',

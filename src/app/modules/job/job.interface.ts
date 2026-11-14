@@ -14,6 +14,8 @@ export interface IJob {
   customServiceName?: string;
   postCode?: string;
   location: string;
+  latitude?: number | null;
+  longitude?: number | null;
 
   budget?: number | null;
   preferredDate?: Date | null;

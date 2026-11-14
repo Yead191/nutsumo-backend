@@ -7,6 +7,9 @@ const createArtisanProfileZodSchema = z.object({
     bio: z.string().optional(),
     location: z.string().optional(),
     postCode: z.string().optional(),
+    serviceLatitude: z.number().min(-90).max(90).optional(),
+    serviceLongitude: z.number().min(-180).max(180).optional(),
+    serviceRadiusKm: z.number().min(1).max(150).optional(),
     experienceYears: z.number().min(0).optional(),
     availabilityStatus: z
       .enum(['Available', 'Booked', 'Unavailable'])
@@ -24,6 +27,9 @@ const updateArtisanProfileZodSchema = z.object({
     bio: z.string().optional(),
     location: z.string().optional(),
     postCode: z.string().optional(),
+    serviceLatitude: z.number().min(-90).max(90).optional(),
+    serviceLongitude: z.number().min(-180).max(180).optional(),
+    serviceRadiusKm: z.number().min(1).max(150).optional(),
     experienceYears: z.number().min(0).optional(),
     availabilityStatus: z
       .enum(['Available', 'Booked', 'Unavailable'])

@@ -208,7 +208,7 @@ export const handleBookingPayment = async (
       title: 'Escrow Payment Secured! 💰',
       message: `The customer has funded Booking #${booking.bookingNumber} ($${Number(booking.totalAmount).toFixed(2)}). You can now begin work safely!`,
       refId: booking._id,
-      path: `/pro/jobs/${booking._id}`,
+      path: `/pro/jobs/${booking.job}`,
       seen: false,
     });
 

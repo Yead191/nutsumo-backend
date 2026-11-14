@@ -11,6 +11,18 @@ export interface IArtisanProfile {
   bio?: string;
   location?: string;
   postCode?: string;
+  serviceLatitude?: number;
+  serviceLongitude?: number;
+  serviceRadiusKm?: number;
+  baseLocation?: {
+    type: 'Point';
+    coordinates: [number, number];
+  };
+  quotesSent?: number;
+  quotesAccepted?: number;
+  acceptRate?: number;
+  responseTimeMinutes?: number;
+  responseSamples?: number;
   experienceYears?: number;
   availabilityStatus: AvailabilityStatus;
   hourlyRate?: number;

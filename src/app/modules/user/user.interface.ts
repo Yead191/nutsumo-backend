@@ -22,6 +22,9 @@ export interface IUser {
   phone?: string;
   location?: string;
   postCode?: string;
+  serviceLatitude?: number;
+  serviceLongitude?: number;
+  serviceRadiusKm?: number;
 
   // Identity Verification (NID Front, Back & Selfie)
   idCardFront?: string;

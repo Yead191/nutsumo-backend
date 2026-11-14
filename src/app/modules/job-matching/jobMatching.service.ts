@@ -15,6 +15,9 @@ import {
   NAME_MATCH_THRESHOLD,
   tokenRegex,
 } from '../artisanService/serviceMatch';
+import { distanceKm, isCoord } from '../../../shared/geo';
+import { ElasticArtisanRank } from './elasticRank';
+import { JobAlertServices } from '../jobAlert/jobAlert.service';
 
 const normalize = (value?: string | null) => value?.trim().toLowerCase() ?? '';
 
@@ -140,7 +143,9 @@ const getJobMatches = async (jobId: string): Promise<IJobMatch[]> => {
     availabilityStatus: 'Available',
     isProfilePublic: true,
   })
-    .select('user postCode location')
+    .select(
+      'user postCode location serviceLatitude serviceLongitude serviceRadiusKm baseLocation rating acceptRate responseTimeMinutes responseSamples trade businessName',
+    )
     .lean();
 
   const profileMap = new Map(
@@ -172,8 +177,29 @@ const getJobMatches = async (jobId: string): Promise<IJobMatch[]> => {
       Boolean(artisanLocation) &&
       jobLocation === artisanLocation;
 
-    // When location data exists, require at least one exact match.
-    if (hasLocationConstraint && !postcodeMatches && !locationMatches) {
+    const artisanLat =
+      profile.serviceLatitude ?? profile.baseLocation?.coordinates?.[1];
+    const artisanLng =
+      profile.serviceLongitude ?? profile.baseLocation?.coordinates?.[0];
+    const withinRadius =
+      isCoord(job.latitude) &&
+      isCoord(job.longitude) &&
+      isCoord(artisanLat) &&
+      isCoord(artisanLng)
+        ? distanceKm(job.latitude, job.longitude, artisanLat, artisanLng) <=
+          (profile.serviceRadiusKm || 25)
+        : null;
+
+    if (withinRadius === false) {
+      return [];
+    }
+
+    if (
+      withinRadius == null &&
+      hasLocationConstraint &&
+      !postcodeMatches &&
+      !locationMatches
+    ) {
       return [];
     }
 
@@ -233,6 +259,35 @@ const getJobMatches = async (jobId: string): Promise<IJobMatch[]> => {
       matchReason.push('LOCATION_MATCH');
     }
 
+    if (withinRadius) {
+      const radius = profile.serviceRadiusKm || 25;
+      const km = distanceKm(
+        job.latitude as number,
+        job.longitude as number,
+        artisanLat as number,
+        artisanLng as number,
+      );
+      matchScore += Math.round(30 * (1 - Math.min(km, radius) / radius));
+      matchReason.push('WITHIN_RADIUS');
+    }
+
+    if ((profile.responseSamples || 0) >= 3) {
+      if (typeof profile.acceptRate === 'number') {
+        matchScore += Math.round(profile.acceptRate * 15);
+        matchReason.push('ACCEPT_RATE');
+      }
+      if (typeof profile.responseTimeMinutes === 'number') {
+        if (profile.responseTimeMinutes <= 60) matchScore += 10;
+        else if (profile.responseTimeMinutes <= 240) matchScore += 6;
+        else if (profile.responseTimeMinutes <= 1440) matchScore += 3;
+        matchReason.push('RESPONSE_TIME');
+      }
+    }
+
+    if (typeof profile.rating === 'number') {
+      matchScore += Math.round((profile.rating / 5) * 8);
+    }
+
     return [
       {
         artisan: item.artisan as Types.ObjectId,
@@ -258,9 +313,37 @@ const getJobMatches = async (jobId: string): Promise<IJobMatch[]> => {
     }
   }
 
-  return [...uniqueMatches.values()].sort(
-    (a, b) => b.matchScore - a.matchScore,
+  const ranked = [...uniqueMatches.values()];
+  const elasticScores = await ElasticArtisanRank.textScores(
+    nameQueryText,
+    ranked.map(match => String(match.artisan)),
   );
+
+  for (const match of ranked) {
+    const boost = elasticScores.get(String(match.artisan));
+    if (!boost) continue;
+    match.matchScore += boost;
+    match.matchReason.push('SEARCH_RANK');
+  }
+
+  void ElasticArtisanRank.indexArtisans(
+    ranked.slice(0, 50).map(match => {
+      const profile = profileMap.get(String(match.artisan));
+      return {
+        artisanId: String(match.artisan),
+        text: [profile?.trade, profile?.businessName, nameQueryText]
+          .filter(Boolean)
+          .join(' '),
+        acceptRate: profile?.acceptRate,
+        responseTimeMinutes: profile?.responseTimeMinutes,
+        rating: profile?.rating,
+        lat: profile?.serviceLatitude,
+        lng: profile?.serviceLongitude,
+      };
+    }),
+  );
+
+  return ranked.sort((a, b) => b.matchScore - a.matchScore);
 };
 
 /**
@@ -273,8 +356,18 @@ const executeJobMatchingAndNotification = async (data: IJobMatchingJobData) => {
   logger.info(`[JobMatching] Finding matches for Job: ${jobId}`);
 
   const matches = await getJobMatches(jobId);
+  const shortlist = matches.slice(0, 25);
 
-  if (!matches || matches.length === 0) {
+  try {
+    await JobAlertServices.notifyForJob(
+      jobId,
+      shortlist.map(match => String(match.artisan)),
+    );
+  } catch (error: any) {
+    logger.warn(`[JobAlert] Saved alerts skipped: ${error?.message || error}`);
+  }
+
+  if (!shortlist.length) {
     logger.info(`[JobMatching] No matching artisans found for Job: ${jobId}`);
     return { jobId, matchedCount: 0, notificationsSent: 0 };
   }
@@ -283,7 +376,7 @@ const executeJobMatchingAndNotification = async (data: IJobMatchingJobData) => {
     `[JobMatching] Found ${matches.length} matching artisans for Job: ${jobId}`,
   );
 
-  const notifications = matches.map(match => ({
+  const notifications = shortlist.map(match => ({
     receiver: match.artisan,
     title: 'New job available',
     message: `A customer posted "${jobTitle || 'a new job'}" and it matches a service you offer.`,

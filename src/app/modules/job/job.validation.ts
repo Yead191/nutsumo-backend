@@ -53,6 +53,9 @@ const jobPayloadSchema = z.object({
     .max(10, 'Post code cannot exceed 10 characters')
     .optional(),
 
+  latitude: z.coerce.number().min(-90).max(90).optional(),
+  longitude: z.coerce.number().min(-180).max(180).optional(),
+
   selectedArtisan: objectIdSchema.nullable().optional(),
 
   images: z.array(z.string()).optional(),

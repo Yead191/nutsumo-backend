@@ -79,6 +79,8 @@ const jobSchema = new Schema<IJob, JobModel>(
       type: String,
       trim: true,
     },
+    latitude: { type: Number },
+    longitude: { type: Number },
     selectedQuotation: {
       type: Schema.Types.ObjectId,
       ref: 'Quotation',

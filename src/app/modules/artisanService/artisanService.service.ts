@@ -307,8 +307,16 @@ const getAllArtisanServices = async (query: Record<string, unknown> = {}) => {
     filter.rateType = query.rateType;
   }
 
-  if (query.isActive !== undefined) {
+  if (query.isActive !== undefined && query.isActive !== '') {
     filter.isActive = query.isActive === 'true' || query.isActive === true;
+  }
+
+  if (typeof query.source === 'string' && query.source) {
+    filter.source = query.source;
+  }
+
+  if (typeof query.reviewStatus === 'string' && query.reviewStatus) {
+    filter.reviewStatus = query.reviewStatus;
   }
 
   const results = await ArtisanService.find(filter)

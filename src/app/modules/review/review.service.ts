@@ -423,6 +423,28 @@ const updateReview = async (
   return review;
 };
 
+const getAllReviewsAdmin = async (query: Record<string, any>) => {
+  const qb = new QueryBuilder(
+    Review.find().populate([
+      { path: 'customer', select: 'name email image' },
+      { path: 'artisan', select: 'name email image' },
+      { path: 'job', select: 'title' },
+    ]),
+    query,
+  )
+    .search(['comment'])
+    .filter()
+    .sort()
+    .paginate();
+
+  const [reviews, pagination] = await Promise.all([
+    qb.modelQuery.lean().exec(),
+    qb.getPaginationInfo(),
+  ]);
+
+  return { reviews, pagination };
+};
+
 export const ReviewServices = {
   createReview,
   getArtisanReviews,
@@ -430,5 +452,6 @@ export const ReviewServices = {
   replyToReview,
   getMyReviews,
   updateReview,
+  getAllReviewsAdmin,
   recalculateArtisanRating,
 };
