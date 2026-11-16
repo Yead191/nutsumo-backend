@@ -1,7 +1,7 @@
 import config from '../config';
 
 export const NUTSUMO_LOGO_URL =
-  'https://res.cloudinary.com/dknmebeee/image/upload/v1793003088/logo-nutsumo_yribt1.png';
+  'https://res.cloudinary.com/dknmebeee/image/upload/v1794809775/image_1_mjfnjq.png';
 
 interface EmailLayoutOptions {
   headline?: string;
