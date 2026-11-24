@@ -17,6 +17,7 @@
     "init-load": "ts-node ./src/load-balancer.conf.ts",
     "build": "tsc",
     "backup": "ts-node src/shared/backup.ts",
+    "seed:categories": "ts-node src/DB/seedCategories.ts",
     "start": "node dist/server.js"
   },
   "keywords": [],

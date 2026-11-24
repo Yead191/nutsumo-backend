@@ -192,6 +192,8 @@ export const seedSuperAdmin = async () => {
           description: cat.description,
           isActive: true,
         },
+        // Core platform categories rank above seeded global ones.
+        $setOnInsert: { priority: 1000 },
       },
       { upsert: true, new: true },
     );

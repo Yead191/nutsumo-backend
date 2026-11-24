@@ -6,6 +6,7 @@ export interface ICategory {
   description?: string;
   isActive: boolean;
   image?: string;
+  priority?: number;
   createdAt: Date;
   updatedAt: Date;
 }

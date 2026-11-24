@@ -52,7 +52,11 @@ const getAllCategories = async (
     ? {}
     : { isActive: true };
 
-  const qb = new QueryBuilder(Category.find(initQuery), query)
+  // Default order: highest priority first, then alphabetical.
+  const qb = new QueryBuilder(Category.find(initQuery), {
+    ...query,
+    sort: query.sort || '-priority name',
+  })
     .search(['name'])
     .filter()
     .sort()

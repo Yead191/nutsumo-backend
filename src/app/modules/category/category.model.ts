@@ -27,6 +27,12 @@ const categorySchema = new Schema<ICategory, CategoryModel>(
     image: {
       type: String,
     },
+    // Higher = shown first. Core platform categories use 1000.
+    priority: {
+      type: Number,
+      default: 0,
+      index: true,
+    },
   },
   {
     timestamps: true,
