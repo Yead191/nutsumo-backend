@@ -4,6 +4,14 @@ import catchAsync from '../../../shared/catchAsync';
 import sendResponse from '../../../shared/sendResponse';
 import { CategoryServices } from './category.service';
 import { getSingleFilePath } from '../../../shared/getFilePath';
+import { revalidateFrontend } from '../../../helpers/revalidateFrontend';
+
+// Cache tags used by the Next.js frontend for category data.
+const categoryCacheTags = (category?: { _id?: unknown; slug?: string } | null) => [
+  'categories',
+  ...(category?._id ? [`category-${String(category._id)}`] : []),
+  ...(category?.slug ? [`category-${category.slug}`] : []),
+];
 
 const createCategory = catchAsync(async (req: Request, res: Response) => {
   const data = req.body;
@@ -12,6 +20,7 @@ const createCategory = catchAsync(async (req: Request, res: Response) => {
     data.image = image;
   }
   const result = await CategoryServices.createCategory(data);
+  revalidateFrontend(categoryCacheTags(result));
   return sendResponse(res, {
     success: true,
     statusCode: StatusCodes.CREATED,
@@ -48,6 +57,10 @@ const updateCategory = catchAsync(async (req: Request, res: Response) => {
     data.image = image;
   }
   const result = await CategoryServices.updateCategory(req.params.id, data);
+  revalidateFrontend([
+    ...categoryCacheTags(result),
+    `category-${req.params.id}`,
+  ]);
   return sendResponse(res, {
     success: true,
     statusCode: StatusCodes.OK,
@@ -58,6 +71,10 @@ const updateCategory = catchAsync(async (req: Request, res: Response) => {
 
 const deleteCategory = catchAsync(async (req: Request, res: Response) => {
   const result = await CategoryServices.deleteCategory(req.params.id);
+  revalidateFrontend([
+    ...categoryCacheTags(result),
+    `category-${req.params.id}`,
+  ]);
   return sendResponse(res, {
     success: true,
     statusCode: StatusCodes.OK,

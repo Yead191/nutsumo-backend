@@ -274,6 +274,7 @@ const userIdOf = (profile: { user?: any }) => {
 const presentProfile = (
   profile: Record<string, any>,
   tokens: string[],
+  serviceId?: string,
 ): Record<string, any> => {
   const list = Array.isArray(profile.offerings) ? profile.offerings : [];
   const scoreOf = (item: (typeof list)[number]) => {
@@ -281,7 +282,12 @@ const presentProfile = (
     return tokens.reduce((sum, token) => sum + (label.includes(token) ? 1 : 0), 0);
   };
   const ranked = [...list].sort((left, right) => scoreOf(right) - scoreOf(left));
-  const best = ranked[0] && scoreOf(ranked[0]) > 0 ? ranked[0] : undefined;
+  // Filtering by a catalog service → show that exact offering's price on the card.
+  const serviceMatch = serviceId
+    ? list.find(item => String(item.service?._id ?? item.service ?? '') === serviceId)
+    : undefined;
+  const best =
+    serviceMatch || (ranked[0] && scoreOf(ranked[0]) > 0 ? ranked[0] : undefined);
   const cheapest = [...list]
     .filter(item => Number(item.rateAmount) > 0)
     .sort((left, right) => left.rateAmount - right.rateAmount)[0];
@@ -388,6 +394,7 @@ const loadDiscoverPage = async (
     limit: number;
     sortKey: string;
     tokens: string[];
+    serviceId?: string;
     useText: boolean;
     paginate: boolean;
   },
@@ -423,7 +430,9 @@ const loadDiscoverPage = async (
   }>(pipeline);
 
   return {
-    profiles: (aggregated?.rows || []).map(row => presentProfile(row, options.tokens)),
+    profiles: (aggregated?.rows || []).map(row =>
+      presentProfile(row, options.tokens, options.serviceId),
+    ),
     total: aggregated?.meta?.[0]?.total || 0,
   };
 };
@@ -457,27 +466,56 @@ const discoverArtisans = async (query: Record<string, unknown>) => {
     filter.$and = [{ $or: [{ location: placeRegex }, { postCode: placeRegex }] }];
   }
 
+  // Restrict to artisans offering work in a category and/or one specific catalog
+  // service. When both are given, an artisan must match both.
+  let allowedArtisanIds: string[] | null = null;
+  const restrictTo = (ids: unknown[]) => {
+    const next = new Set(ids.map(id => String(id)));
+    allowedArtisanIds = allowedArtisanIds
+      ? allowedArtisanIds.filter(id => next.has(id))
+      : [...next];
+  };
+
   const categoryId = String(query.category || '').trim();
   if (categoryId && mongoose.Types.ObjectId.isValid(categoryId)) {
     const serviceIds = await Service.find({
       category: categoryId,
       isActive: true,
     }).distinct('_id');
-    const artisanIds = await ArtisanService.distinct('artisan', {
-      isActive: true,
-      reviewStatus: { $ne: 'REJECTED' },
-      $or: [
-        { category: categoryId },
-        ...(serviceIds.length ? [{ service: { $in: serviceIds } }] : []),
-      ],
-    });
-    if (!artisanIds.length) {
+    restrictTo(
+      await ArtisanService.distinct('artisan', {
+        isActive: true,
+        reviewStatus: { $ne: 'REJECTED' },
+        $or: [
+          { category: categoryId },
+          ...(serviceIds.length ? [{ service: { $in: serviceIds } }] : []),
+        ],
+      }),
+    );
+  }
+
+  const rawServiceId = String(query.service || '').trim();
+  const serviceId =
+    rawServiceId && mongoose.Types.ObjectId.isValid(rawServiceId) ? rawServiceId : '';
+  if (serviceId) {
+    restrictTo(
+      await ArtisanService.distinct('artisan', {
+        service: serviceId,
+        isActive: true,
+        reviewStatus: { $ne: 'REJECTED' },
+      }),
+    );
+  }
+
+  if (allowedArtisanIds) {
+    const ids: string[] = allowedArtisanIds;
+    if (!ids.length) {
       return {
         profiles: [],
         pagination: { total: 0, limit, page, totalPage: 0 },
       };
     }
-    filter.user = { $in: artisanIds };
+    filter.user = { $in: ids };
   }
 
   const pageOptions = {
@@ -485,6 +523,7 @@ const discoverArtisans = async (query: Record<string, unknown>) => {
     limit,
     sortKey,
     tokens,
+    serviceId,
   };
   const cardMatches = (card: Record<string, any>) => {
     if (card.isProfilePublic === false) return false;
@@ -513,7 +552,7 @@ const discoverArtisans = async (query: Record<string, unknown>) => {
   if (elastic?.cards.length && elastic.cards.length === elastic.ids.length) {
     const profiles = elastic.cards
       .filter(card => cardMatches(card as Record<string, any>))
-      .map(card => presentProfile(card as Record<string, any>, tokens));
+      .map(card => presentProfile(card as Record<string, any>, tokens, serviceId));
     if (profiles.length) {
       result = { profiles, total: elastic.total };
       usedText = true;
