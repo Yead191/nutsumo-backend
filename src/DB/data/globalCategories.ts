@@ -12,7 +12,7 @@ export type GlobalCategoryEntry = [string, string, string[]];
 
 export const globalCategories: GlobalCategoryEntry[] = [
   // ── Existing platform categories (shown first) ──────────────────
-  ['Software Engineering', 'Software design, development, and engineering.', []],
+  ['Software Engineering', 'Software design, development, and engineering.', ['Custom Software Development', 'API Development & Integration', 'System Architecture & Design', 'Bug Fixing & Maintenance', 'Code Review & Refactoring', 'Desktop Application Development', 'SaaS Product Development', 'Software Maintenance & Support']],
   ['House Cleaning', 'Standard, deep, and move-out home cleaning.', []],
   ['Landscaping', 'Lawn, garden, tree, and outdoor work.', []],
   ['Masonry & Tile', 'Brick, stone, grout, and tile installation & repair.', []],
