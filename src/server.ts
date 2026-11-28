@@ -5,6 +5,8 @@ import { errorLogger, logger } from './shared/logger';
 import colors from 'colors';
 import { socketHelper } from './helpers/socketHelper';
 import { Server } from 'socket.io';
+import { createAdapter } from '@socket.io/redis-adapter';
+import { redisClient } from './config/redis';
 import { seedSuperAdmin } from './DB/seedAdmin';
 import { setupCluster } from './config/cluster/node.cluster';
 import cluster from 'cluster';
@@ -58,6 +60,10 @@ export async function main() {
         origin: '*',
       },
     });
+
+    // Redis adapter: the app runs one process per CPU (cluster), so events
+    // emitted on one worker must reach sockets connected to the others.
+    io.adapter(createAdapter(redisClient.duplicate(), redisClient.duplicate()));
 
     socketHelper.socket(io);
 
